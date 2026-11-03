@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-import { AppShell, CardGrid, ErrorState, Section } from "@/components/AppShell";
+import { AppShell, CardColumns, ErrorState, Section } from "@/components/AppShell";
 import { DecisionLabel, decisionStyle } from "@/components/Decision";
 import { NepalPriceChart } from "@/components/NepalPriceChart";
 import { PlanActions } from "@/components/PlanActions";
@@ -114,7 +114,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </p>
       )}
 
-      <CardGrid>
+      <CardColumns
+        left={[
       <Section title={`Nepal ${label}, per tola`}>
         {d.prices.nepal_per_tola == null ? (
           <p className="text-ink-2">Not collected yet.</p>
@@ -159,26 +160,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             </div>
           </>
         )}
-      </Section>
-
-      <Section title="Why" updated={d.created_at}>
-        <ul className="space-y-3 text-[17px] leading-relaxed">
-          {d.reasons.map((reason) => (
-            <li key={reason.plain} className="flex gap-3">
-              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
-              <span>{reason.plain}</span>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
-          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors hover:bg-accent-hover"
-        >
-          View detailed analysis
-          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
-        </Link>
-      </Section>
-
+      </Section>,
       <Section title="What would change this" updated={d.created_at}>
         <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
         {d.next_event && (
@@ -187,32 +169,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             {d.next_event.forces_wait === false ? " It can move prices sharply either way." : ""}
           </p>
         )}
-      </Section>
-
-      <Section title="AI's take" updated={ai?.result?.finished_at}>
-        {ai?.result ? (
-          <>
-            <p className="text-[17px] leading-relaxed">{ai.result.output.plain_summary}</p>
-            <p className="mt-2 text-xs text-ink-2">
-              {PROVIDER_NAMES[ai.result.provider] ?? ai.result.provider} · checked against the
-              app's own numbers
-            </p>
-          </>
-        ) : (
-          <p className="text-ink-2">No AI answer yet.</p>
-        )}
-        {ai?.latest_run && ["failed", "invalid", "expired"].includes(ai.latest_run.status) && (
-          <p className="mt-2 text-sm text-ink-2">
-            The last AI check didn't work{ai.latest_run.status === "invalid" ? " (its answer quoted numbers the app couldn't confirm, so it was not used)" : ""}.
-            {ai.result ? " Showing the previous answer." : ""}
-          </p>
-        )}
-        <div className="mt-4">
-          <AskAiButton key={asset} asset={asset} busy={!!ai?.latest_run && ["queued", "running"].includes(ai.latest_run.status)} />
-        </div>
-      </Section>
-
-      {d.forecasts.length > 0 && (
+      </Section>,
+d.forecasts.length > 0 && (
         <Section title={`What might happen to world ${label}`} updated={d.created_at}>
           <ul className="space-y-5">
             {d.forecasts.map((f) => (
@@ -243,14 +201,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             Based on what happened after the {d.forecasts[0]?.sample_size ?? 100} most similar days in the available history. A guide, not a promise.
           </p>
         </Section>
-      )}
-
-      {news && (
-        <Section title={`${d.asset.label} in the news`}>
-          <NewsSection key={asset} news={news} asset={asset} label={label} />
-        </Section>
-      )}
-
+      ),
       <Section title="Your purchase">
         <p className="mb-3 text-[15px] text-ink-2">
           {plan.completed_at
@@ -260,8 +211,55 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
               : "Not waiting yet."}
         </p>
         <PlanActions key={asset} plan={plan} asset={asset} label={label} />
-      </Section>
-      </CardGrid>
+      </Section>,
+        ]}
+        right={[
+      <Section title="Why" updated={d.created_at}>
+        <ul className="space-y-3 text-[17px] leading-relaxed">
+          {d.reasons.map((reason) => (
+            <li key={reason.plain} className="flex gap-3">
+              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
+              <span>{reason.plain}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
+          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors hover:bg-accent-hover"
+        >
+          View detailed analysis
+          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
+        </Link>
+      </Section>,
+      <Section title="AI's take" updated={ai?.result?.finished_at}>
+        {ai?.result ? (
+          <>
+            <p className="text-[17px] leading-relaxed">{ai.result.output.plain_summary}</p>
+            <p className="mt-2 text-xs text-ink-2">
+              {PROVIDER_NAMES[ai.result.provider] ?? ai.result.provider} · checked against the
+              app's own numbers
+            </p>
+          </>
+        ) : (
+          <p className="text-ink-2">No AI answer yet.</p>
+        )}
+        {ai?.latest_run && ["failed", "invalid", "expired"].includes(ai.latest_run.status) && (
+          <p className="mt-2 text-sm text-ink-2">
+            The last AI check didn't work{ai.latest_run.status === "invalid" ? " (its answer quoted numbers the app couldn't confirm, so it was not used)" : ""}.
+            {ai.result ? " Showing the previous answer." : ""}
+          </p>
+        )}
+        <div className="mt-4">
+          <AskAiButton key={asset} asset={asset} busy={!!ai?.latest_run && ["queued", "running"].includes(ai.latest_run.status)} />
+        </div>
+      </Section>,
+news && (
+        <Section title={`${d.asset.label} in the news`}>
+          <NewsSection key={asset} news={news} asset={asset} label={label} />
+        </Section>
+      ),
+        ]}
+      />
 
       <footer className="mt-6 px-1 text-xs leading-relaxed text-ink-2">
         <p className="num">Advice updated {stamp(d.created_at)}.</p>

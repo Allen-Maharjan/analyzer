@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-import { AppShell, CardGrid, ErrorState, Section } from "@/components/AppShell";
+import { AppShell, CardColumns, ErrorState, Section } from "@/components/AppShell";
 import type { ChartLevel } from "@/components/CandleChart";
 import { WorldChart } from "@/components/WorldChart";
 import { DecisionLabel } from "@/components/Decision";
@@ -181,7 +181,8 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         <DecisionLabel decision={s.decision.decision} /> · {nepalTime(s.created_at)}
       </p>
 
-      <CardGrid>
+      <CardColumns
+        left={[
       <Section title="Nepal vs world price" updated={s.created_at}>
         <p className="mb-3 text-sm leading-relaxed text-ink-2">
           World {snapshot.asset.label.toLowerCase()} converted to rupees per tola (price × dollar rate × 0.375). Nepal's price normally sits a steady
@@ -207,12 +208,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
           ],
           [`World ${snapshot.asset.label.toLowerCase()} since Nepal's update`, percent(lag.intl_change_since_publication_pct)],
         ])}
-      </Section>
-
-      <Section title={`World ${snapshot.asset.label.toLowerCase()} prices`}>
-        <WorldChart key={asset} asset={asset} label={snapshot.asset.label.toLowerCase()} initialCandles={candles?.candles ?? []} levels={chartLevels} />
-      </Section>
-
+      </Section>,
       <Section title="AI analysis" updated={ai?.result?.finished_at}>
         {ai?.result ? (
           <>
@@ -257,9 +253,92 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         ) : (
           <p className="text-ink-2">No AI answer yet. Ask from the Today page.</p>
         )}
-      </Section>
-
-      {s.forecasts && s.forecasts.length > 0 && (
+      </Section>,
+      <Section title="Reasons" updated={s.created_at}>
+        <ul className="space-y-5">
+          {s.decision.reasons.map((r) => (
+            <li key={r.plain}>
+              <p className="text-[17px] leading-relaxed">{r.plain}</p>
+              <p className="num mt-1 text-sm text-ink-2">{r.detail}</p>
+            </li>
+          ))}
+        </ul>
+      </Section>,
+s.price_levels && (s.price_levels.pivots || s.price_levels.fibonacci) && (
+        <Section title="Price levels" updated={s.created_at}>
+          {s.price_levels.pivots && (
+            <>
+              <p className="text-sm text-ink-2">
+                Pivot points from the last full trading day. Traders watch these as likely turning prices: R above the
+                price, S below.
+              </p>
+              <dl className="num mt-3 grid grid-cols-7 gap-1 text-center text-xs">
+                {Object.entries(s.price_levels.pivots.levels).map(([k, v]) => (
+                  <div key={k} className={`rounded-md py-2 ${k === "P" ? "bg-accent-soft" : "bg-ground"}`}>
+                    <dt className={`font-semibold ${k.startsWith("R") ? "text-wait" : k.startsWith("S") ? "text-buy" : "text-accent-hover"}`}>{k}</dt>
+                    <dd className="mt-0.5 text-ink">{Math.round(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
+          {s.price_levels.fibonacci && (
+            <>
+              <p className="mt-5 text-sm text-ink-2">
+                Fibonacci levels across the last six months ({usd(s.price_levels.fibonacci.high)} to{" "}
+                {usd(s.price_levels.fibonacci.low)}, moving {s.price_levels.fibonacci.direction}). Bounces often stall
+                near 38.2%, 50% and 61.8%.
+              </p>
+              <ul className="num mt-2 divide-y divide-line text-[15px]">
+                {s.price_levels.fibonacci.levels.map((l) => {
+                  const near = close && Math.abs(l.price - close) / close < 0.01;
+                  return (
+                    <li key={l.ratio} className={`flex justify-between py-1.5 ${near ? "font-semibold text-accent-hover" : ""}`}>
+                      <span>{(l.ratio * 100).toFixed(1)}%</span>
+                      <span>
+                        {usd(l.price)}
+                        {near ? " · near now" : ""}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+        </Section>
+      ),
+      <Section title="By time scale" updated={s.created_at}>
+        <ul className="divide-y divide-line">
+          {TIMEFRAMES.filter((tf) => s.timeframes[tf]).map((tf) => {
+            const t = s.timeframes[tf];
+            return (
+              <li key={tf} className="py-3 text-[15px]">
+                <div className="flex justify-between gap-4">
+                  <span className="font-medium">{tf}</span>
+                  <span className="num text-ink-2">
+                    trend {score(t.components.trend?.value)} · momentum {score(t.components.momentum?.value)} · RSI{" "}
+                    {t.indicators.rsi_14?.toFixed(0) ?? "—"}
+                  </span>
+                </div>
+                {t.level_states.length > 0 && (
+                  <p className="num mt-1 text-sm text-ink-2">
+                    {t.level_states
+                      .map((ls) => `${usd(ls.price)} ${STATE_WORDS[ls.state] ?? ls.state}`)
+                      .join(" · ")}
+                  </p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-3 text-sm text-ink-2">RSI above 70 means recently very strong, below 30 very weak.</p>
+      </Section>,
+        ]}
+        right={[
+      <Section title={`World ${snapshot.asset.label.toLowerCase()} prices`}>
+        <WorldChart key={asset} asset={asset} label={snapshot.asset.label.toLowerCase()} initialCandles={candles?.candles ?? []} levels={chartLevels} />
+      </Section>,
+s.forecasts && s.forecasts.length > 0 && (
         <Section title="Scenarios" updated={s.created_at}>
           <p className="mb-3 text-sm leading-relaxed text-ink-2">
             For each time span, the app finds up to 100 past days most like today (trend, momentum, RSI, recent move,
@@ -305,20 +384,8 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
             ))}
           </ul>
         </Section>
-      )}
-
-      <Section title="Reasons" updated={s.created_at}>
-        <ul className="space-y-5">
-          {s.decision.reasons.map((r) => (
-            <li key={r.plain}>
-              <p className="text-[17px] leading-relaxed">{r.plain}</p>
-              <p className="num mt-1 text-sm text-ink-2">{r.detail}</p>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      {s.technical && (
+      ),
+s.technical && (
         <Section title="Indicators" updated={s.created_at}>
           <div className="mb-4 grid grid-cols-4 gap-2 text-center text-xs">
             {["1h", "4h", "1D", "1W"].filter((tf) => s.technical?.[tf]).map((tf) => {
@@ -353,52 +420,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
             ))}
           </ul>
         </Section>
-      )}
-
-      {s.price_levels && (s.price_levels.pivots || s.price_levels.fibonacci) && (
-        <Section title="Price levels" updated={s.created_at}>
-          {s.price_levels.pivots && (
-            <>
-              <p className="text-sm text-ink-2">
-                Pivot points from the last full trading day. Traders watch these as likely turning prices: R above the
-                price, S below.
-              </p>
-              <dl className="num mt-3 grid grid-cols-7 gap-1 text-center text-xs">
-                {Object.entries(s.price_levels.pivots.levels).map(([k, v]) => (
-                  <div key={k} className={`rounded-md py-2 ${k === "P" ? "bg-accent-soft" : "bg-ground"}`}>
-                    <dt className={`font-semibold ${k.startsWith("R") ? "text-wait" : k.startsWith("S") ? "text-buy" : "text-accent-hover"}`}>{k}</dt>
-                    <dd className="mt-0.5 text-ink">{Math.round(v)}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          )}
-          {s.price_levels.fibonacci && (
-            <>
-              <p className="mt-5 text-sm text-ink-2">
-                Fibonacci levels across the last six months ({usd(s.price_levels.fibonacci.high)} to{" "}
-                {usd(s.price_levels.fibonacci.low)}, moving {s.price_levels.fibonacci.direction}). Bounces often stall
-                near 38.2%, 50% and 61.8%.
-              </p>
-              <ul className="num mt-2 divide-y divide-line text-[15px]">
-                {s.price_levels.fibonacci.levels.map((l) => {
-                  const near = close && Math.abs(l.price - close) / close < 0.01;
-                  return (
-                    <li key={l.ratio} className={`flex justify-between py-1.5 ${near ? "font-semibold text-accent-hover" : ""}`}>
-                      <span>{(l.ratio * 100).toFixed(1)}%</span>
-                      <span>
-                        {usd(l.price)}
-                        {near ? " · near now" : ""}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
-        </Section>
-      )}
-
+      ),
       <Section title="Market score" updated={s.created_at}>
         <p className="text-4xl">{score(s.score.deterministic)}</p>
         <p className="mt-1 text-sm text-ink-2">
@@ -420,36 +442,9 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
             );
           })}
         </ul>
-      </Section>
-
-      <Section title="By time scale" updated={s.created_at}>
-        <ul className="divide-y divide-line">
-          {TIMEFRAMES.filter((tf) => s.timeframes[tf]).map((tf) => {
-            const t = s.timeframes[tf];
-            return (
-              <li key={tf} className="py-3 text-[15px]">
-                <div className="flex justify-between gap-4">
-                  <span className="font-medium">{tf}</span>
-                  <span className="num text-ink-2">
-                    trend {score(t.components.trend?.value)} · momentum {score(t.components.momentum?.value)} · RSI{" "}
-                    {t.indicators.rsi_14?.toFixed(0) ?? "—"}
-                  </span>
-                </div>
-                {t.level_states.length > 0 && (
-                  <p className="num mt-1 text-sm text-ink-2">
-                    {t.level_states
-                      .map((ls) => `${usd(ls.price)} ${STATE_WORDS[ls.state] ?? ls.state}`)
-                      .join(" · ")}
-                  </p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        <p className="mt-3 text-sm text-ink-2">RSI above 70 means recently very strong, below 30 very weak.</p>
-      </Section>
-
-      </CardGrid>
+      </Section>,
+        ]}
+      />
 
       <p className="mt-12 text-xs text-ink-2">
         {Object.entries(s.versions).map(([k, v]) => `${k} ${v}`).join(" · ")}
