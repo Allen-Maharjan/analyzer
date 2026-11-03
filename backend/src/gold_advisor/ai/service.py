@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from gold_advisor.ai import contract
 from gold_advisor.assets import AssetDefinition, GOLD
@@ -150,12 +150,18 @@ def complete(session: Session, job_id: int, raw_output: str | None, cli_version:
 
 def latest(session: Session, asset: AssetDefinition = GOLD) -> dict:
     """Latest good AI result plus the state of the newest run, for the dashboard."""
+    # The prompt input and raw model output are large and not shown on the dashboard.
+    light = (defer(AiAnalysisRow.input), defer(AiAnalysisRow.raw_output), defer(AiAnalysisRow.validation))
     good = session.scalars(
-        select(AiAnalysisRow).where(AiAnalysisRow.status == "succeeded", AiAnalysisRow.asset_id == asset.id).order_by(AiAnalysisRow.finished_at.desc()).limit(1)
+        select(AiAnalysisRow).options(*light).where(AiAnalysisRow.status == "succeeded", AiAnalysisRow.asset_id == asset.id).order_by(AiAnalysisRow.finished_at.desc()).limit(1)
     ).first()
-    newest = session.scalars(select(AiAnalysisRow).where(AiAnalysisRow.asset_id == asset.id).order_by(AiAnalysisRow.created_at.desc()).limit(1)).first()
-    snap = session.get(AnalysisSnapshotRow, good.snapshot_id) if good else None
-    det = float(snap.deterministic_score) if snap and snap.deterministic_score is not None else None
+    newest = session.scalars(select(AiAnalysisRow).options(*light).where(AiAnalysisRow.asset_id == asset.id).order_by(AiAnalysisRow.created_at.desc()).limit(1)).first()
+    score = (
+        session.scalar(select(AnalysisSnapshotRow.deterministic_score).where(AnalysisSnapshotRow.id == good.snapshot_id))
+        if good
+        else None
+    )
+    det = float(score) if score is not None else None
     adjusted = None
     if good and det is not None:
         adjusted = round(max(-100.0, min(100.0, det + float(good.output["adjustment"]))), 2)

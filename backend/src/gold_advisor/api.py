@@ -14,7 +14,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -33,7 +33,7 @@ from gold_advisor.domain import (
     Source,
     Timeframe,
 )
-from gold_advisor.persistence.db import session_scope
+from gold_advisor.persistence.db import read_session_scope, session_scope
 from gold_advisor.persistence.models import (
     AnalysisSnapshotRow,
     AppSettingRow,
@@ -110,8 +110,10 @@ def dispatch_cycle(force_daily: bool = False) -> bool:
 MAX_ROWS = 5000
 
 
-def get_session():
-    with session_scope() as session:
+def get_session(request: Request):
+    # GET requests only read, so skip the transaction round trips.
+    scope = read_session_scope if request.method in ("GET", "HEAD") else session_scope
+    with scope() as session:
         yield session
 
 

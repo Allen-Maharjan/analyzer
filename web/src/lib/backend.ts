@@ -10,7 +10,7 @@ const BASE = process.env.GA_API_URL ?? "http://localhost:8010";
 /** Shared secret the cloud API requires; empty for the local Docker stack. */
 function withToken(init?: RequestInit): RequestInit {
   const token = process.env.GA_INTERNAL_TOKEN;
-  if (!token) return withToken(init);
+  if (!token) return { cache: "no-store", ...init };
   const headers = new Headers(init?.headers);
   headers.set("x-internal-token", token);
   return { cache: "no-store", ...init, headers };
