@@ -38,6 +38,66 @@ from gold_advisor.persistence.models import (
 
 app = FastAPI(title="Nepal Gold Purchase Advisor API", version="0.1.0")
 
+OPEN_PATHS = ("/api/v1/health",)
+SELF_AUTHENTICATED_PREFIX = "/api/v1/runner/"  # checked against the runner token instead
+
+
+@app.middleware("http")
+async def require_internal_token(request, call_next):
+    """In the cloud the API is public, so only the dashboard (which holds the token) may call it."""
+    import hmac
+
+    from fastapi.responses import JSONResponse
+
+    from gold_advisor.config import get_settings as _settings
+
+    token = _settings().internal_token
+    path = request.url.path
+    if token and path not in OPEN_PATHS and not path.startswith(SELF_AUTHENTICATED_PREFIX):
+        given = request.headers.get("x-internal-token", "")
+        if not hmac.compare_digest(given.encode(), token.encode()):
+            return JSONResponse({"detail": "not authorised"}, status_code=401)
+    return await call_next(request)
+
+
+def cooldown_passed(session: Session, key: str, seconds: int) -> bool:
+    """Database-backed rate limit, so it works without Redis (Vercel) and with it (Docker)."""
+    from datetime import timedelta
+
+    row = session.get(AppSettingRow, f"cooldown:{key}")
+    now = datetime.now(UTC)
+    if row is not None and row.updated_at > now - timedelta(seconds=seconds):
+        return False
+    row = row or AppSettingRow(key=f"cooldown:{key}", value={})
+    row.value, row.updated_at = {"at": now.isoformat()}, now
+    session.add(row)
+    session.flush()
+    return True
+
+
+def dispatch_cycle(force_daily: bool = False) -> bool:
+    """Start the GitHub Actions cycle. Returns False when cloud dispatch is not configured."""
+    import httpx
+
+    from gold_advisor.config import get_settings as _settings
+
+    cfg = _settings()
+    if not (cfg.github_dispatch_token and cfg.github_repo):
+        return False
+    response = httpx.post(
+        f"https://api.github.com/repos/{cfg.github_repo}/actions/workflows/{cfg.github_workflow}/dispatches",
+        headers={
+            "Authorization": f"Bearer {cfg.github_dispatch_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        json={"ref": cfg.github_ref, "inputs": {"force_daily": "true" if force_daily else "false"}},
+        timeout=15,
+    )
+    if response.status_code != 204:
+        raise HTTPException(status_code=502, detail=f"Couldn't start the update on GitHub ({response.status_code}).")
+    return True
+
 MAX_ROWS = 5000
 
 
@@ -317,13 +377,20 @@ class RefreshOut(BaseModel):
 
 
 @app.post("/api/v1/refresh/{target}", response_model=RefreshOut, status_code=status.HTTP_202_ACCEPTED)
-def refresh(target: RefreshTarget, response: Response) -> RefreshOut:
-    from gold_advisor import tasks
+def refresh(session: SessionDep, target: RefreshTarget, response: Response) -> RefreshOut:
+    from gold_advisor.config import get_settings as _settings
 
-    if not tasks._redis().set(f"gold_advisor:refresh:{'usd_npr' if target is RefreshTarget.USD_NPR else 'nepal_rates'}", 1, nx=True, ex=REFRESH_COOLDOWN_SECONDS):
+    cloud = bool(_settings().github_dispatch_token)
+    # In the cloud one GitHub run refreshes everything, so all targets share one cooldown.
+    key = "refresh" if cloud else f"refresh:{'usd_npr' if target is RefreshTarget.USD_NPR else 'nepal_rates'}"
+    if not cooldown_passed(session, key, REFRESH_COOLDOWN_SECONDS):
         response.status_code = status.HTTP_429_TOO_MANY_REQUESTS
         response.headers["Retry-After"] = str(REFRESH_COOLDOWN_SECONDS)
         return RefreshOut(target=target, queued=False, message="Refreshed less than a minute ago. Try again shortly.")
+    if dispatch_cycle(force_daily=True):
+        return RefreshOut(target=target, queued=True, message="Update started. New prices appear in about 2–3 minutes.")
+    from gold_advisor import tasks
+
     task = tasks.collect_nepal_today if target is not RefreshTarget.USD_NPR else tasks.collect_fx
     task.delay(force=True)
     return RefreshOut(target=target, queued=True, message="Checking the source now. Results appear within a minute.")
@@ -560,16 +627,18 @@ AI_REQUEST_COOLDOWN_SECONDS = 60
 
 @app.post("/api/v1/ai/request", status_code=status.HTTP_202_ACCEPTED)
 def ai_request(session: SessionDep, asset: AssetDep, response: Response) -> dict:
-    from gold_advisor import tasks
-
-    if not tasks._redis().set(f"gold_advisor:ai_request:{asset.id}", 1, nx=True, ex=AI_REQUEST_COOLDOWN_SECONDS):
+    if not cooldown_passed(session, f"ai_request:{asset.id}", AI_REQUEST_COOLDOWN_SECONDS):
         response.status_code = status.HTTP_429_TOO_MANY_REQUESTS
         return {"queued": False, "message": "AI was asked less than a minute ago."}
     row = ai_service.enqueue(session, "manual", asset=asset)
     if row is None:
         response.status_code = status.HTTP_409_CONFLICT
         return {"queued": False, "message": "An AI check is already running."}
-    return {"queued": True, "id": row.id, "message": "Asked the AI. Its answer appears within about two minutes."}
+    job_id = row.id
+    session.commit()  # the GitHub run must see the queued job
+    if dispatch_cycle():
+        return {"queued": True, "id": job_id, "message": "Asked the AI. Its answer appears in about 3–4 minutes."}
+    return {"queued": True, "id": job_id, "message": "Asked the AI. Its answer appears within about two minutes."}
 
 
 def _runner_auth(authorization: str | None) -> None:

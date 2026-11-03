@@ -28,9 +28,14 @@ GitHub Actions (cron :15 and :45 UTC = :00 and :30 NPT, e.g. 11:00 and 11:30; or
                          Calls runner/openrouter.py, then validates with ai/contract.py.
   └─ Neon Postgres (Singapore, Postgres 18, no TimescaleDB)
 
+Vercel (two projects from this repo):
+  analyzer-api  root backend/  FastAPI via backend/app.py; every call needs X-Internal-Token
+  analyzer-web  root web/      Next.js dashboard; calls analyzer-api server-side with the token
+  Refresh and "Ask AI" buttons ─► API ─► GitHub workflow_dispatch (force_daily input)
+  The cycle runs queued "Ask AI" jobs regardless of significance.
+
 Planned, not built:
   Neon Function cron trigger  ─► GitHub workflow_dispatch   (punctual start; Actions cron runs late)
-  Vercel                      ─► Next.js dashboard reading Neon
   Web Push                    ─► phone notifications
 ```
 
@@ -40,6 +45,8 @@ Planned, not built:
 |---|---|---|
 | GitHub repo secrets | `NEON_DATABASE_URL` | Direct (non-pooled) Neon connection string. Required. |
 | GitHub repo secrets | `GA_OPENROUTER_API_KEY` | OpenRouter key. Optional; without it the AI step is skipped. |
+| Vercel `analyzer-api` | `GA_DATABASE_URL` (Neon pooled URL), `GA_INTERNAL_TOKEN`, `GA_GITHUB_DISPATCH_TOKEN`, `GA_GITHUB_REPO` | API, and starting GitHub runs from the buttons |
+| Vercel `analyzer-web` | `GA_API_URL`, `GA_INTERNAL_TOKEN`, `OWNER_PASSWORD`, `SESSION_SECRET`, `COOKIE_SECURE=true` | Dashboard |
 | `.env` (local only, never committed) | the same two, plus `POSTGRES_PASSWORD`, `OWNER_PASSWORD`, `SESSION_SECRET`, `GA_RUNNER_TOKEN` | Local Docker stack and host runner |
 
 Never print these values in logs or chat. `.env` is in `.gitignore`.
@@ -58,7 +65,7 @@ Never print these values in logs or chat. `.env` is in `.gitignore`.
 
 The host AI runner (`runner/gold_ai_runner.py`, systemd user service `gold-ai-runner`) claims queued AI jobs from the API and runs a signed-in CLI or OpenRouter. It exists because CLI sign-ins can't live inside containers or GitHub.
 
-The dashboard (`web/`) currently reads data **through the FastAPI service** (`GA_API_URL`), so it needs local mode running. Moving it to Vercel means either reading Neon directly from Next.js server code or hosting the FastAPI app somewhere.
+The dashboard (`web/`) reads data **through the FastAPI service** (`GA_API_URL`): locally the Docker `api` container, in the cloud the `analyzer-api` Vercel project.
 
 ## Code map
 

@@ -64,8 +64,8 @@ class TestMarketHours:
 class TestFreshness:
     def test_live_quote_fresh_then_stale_while_open(self):
         now = utc(2026, 11, 2, 5, 0)
-        assert freshness.live_quote(now - timedelta(minutes=4), now).status is FreshnessStatus.FRESH
-        assert freshness.live_quote(now - timedelta(minutes=6), now).status is FreshnessStatus.STALE
+        assert freshness.live_quote(now - timedelta(minutes=34), now).status is FreshnessStatus.FRESH
+        assert freshness.live_quote(now - timedelta(minutes=36), now).status is FreshnessStatus.STALE
 
     def test_live_quote_over_weekend_is_market_closed_not_stale(self):
         now = utc(2026, 10, 31, 12, 0)

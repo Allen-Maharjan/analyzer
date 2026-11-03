@@ -58,8 +58,9 @@ def collect(now: datetime) -> None:
         _step(f"spot {asset.id}", lambda a=asset: jobs.collect_gold_spot(a))
         for tf in CANDLE_TIMEFRAMES:
             _step(f"candles {tf.value} {asset.id}", lambda a=asset, t=tf: jobs.collect_candles(t, a))
-    _step("nepal today", jobs.collect_nepal_today)
-    _step("usd/npr", jobs.collect_fx)
+    force = os.environ.get("GA_FORCE_DAILY", "").lower() == "true"  # the dashboard's Refresh button
+    _step("nepal today", lambda: jobs.collect_nepal_today(force=force))
+    _step("usd/npr", lambda: jobs.collect_fx(force=force))
     for job, (every, fn) in SLOW_JOBS.items():
         if _due(job, every, now):
             _step(job, fn)
@@ -115,12 +116,24 @@ def ai_if_significant(asset: AssetDefinition, now: datetime) -> None:
 
     from gold_advisor.ai import contract, service
 
+    from sqlalchemy import select
+
+    from gold_advisor.persistence.models import AiAnalysisRow
+
     with session_scope() as session:
-        reason = _significance(session, asset, now)
+        # A job queued by "Ask AI" on the dashboard runs regardless of significance.
+        row = session.scalars(
+            select(AiAnalysisRow)
+            .where(AiAnalysisRow.asset_id == asset.id, AiAnalysisRow.status == "queued")
+            .order_by(AiAnalysisRow.created_at)
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        ).first()
+        reason = "requested from the dashboard" if row is not None else _significance(session, asset, now)
         if reason is None:
             log.info("AI %s skipped: nothing significant", asset.id)
             return
-        row = service.enqueue(session, "change", now, asset)
+        row = row or service.enqueue(session, "change", now, asset)
         if row is None:
             log.info("AI %s skipped: another run is open", asset.id)
             return

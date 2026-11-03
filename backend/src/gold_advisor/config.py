@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # Shared secret for the host-side AI runner. Empty disables the runner endpoints.
     runner_token: str = ""
 
+    # Cloud deployment (Vercel). When internal_token is set, every API request except
+    # /api/v1/health and the runner endpoints must send it in X-Internal-Token.
+    internal_token: str = ""
+    # When set, the refresh and "Ask AI" buttons start the GitHub Actions cycle instead of
+    # Celery. Fine-grained token with "Actions: read and write" on the repository.
+    github_dispatch_token: str = ""
+    github_repo: str = ""  # e.g. "Allen-Maharjan/analyzer"
+    github_workflow: str = "collect.yml"
+    github_ref: str = "main"
+
 
 @lru_cache
 def get_settings() -> Settings:

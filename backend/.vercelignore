@@ -1,0 +1,5 @@
+.venv
+tests
+.pytest_cache
+dukascopy/node_modules
+**/__pycache__

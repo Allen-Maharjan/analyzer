@@ -11,7 +11,12 @@ on:
     # Every 30 minutes on Nepal time's :00 and :30 (11:00, 11:30, ... NPT).
     # Nepal is UTC+5:45, so NPT :00/:30 is UTC :15/:45. GitHub cron runs in UTC.
     - cron: "15,45 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_daily:
+        description: Re-check Nepal gold and the dollar rate even if today's value is stored
+        type: boolean
+        default: false
 
 # Never run two cycles at once; a late run waits instead of overlapping.
 concurrency:
@@ -30,6 +35,7 @@ jobs:
       GA_OPENROUTER_API_KEY: ${{ secrets.GA_OPENROUTER_API_KEY }}
       PYTHONPATH: ${{ github.workspace }}/runner
       PYTHONUNBUFFERED: "1"
+      GA_FORCE_DAILY: ${{ inputs.force_daily }}
     steps:
       - uses: actions/checkout@v5
 

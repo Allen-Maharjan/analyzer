@@ -4,6 +4,8 @@ Private, self-hosted app that helps one household decide whether to buy gold now
 
 **Status:** Phases 1–3 of 5 are built: data collection, analysis, and the dashboard.
 
+**Architecture (2026-11-03):** the app is moving to the cloud. GitHub Actions runs a collect, analyse and AI cycle every 30 minutes, the database is Neon Postgres, and the AI uses OpenRouter's free models. The local Docker stack below still works and now also uses Neon. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). AI agents: start with [AGENTS.md](AGENTS.md).
+
 **Open the dashboard:** <http://localhost:3010>. The password is `OWNER_PASSWORD` in `.env`. To use it from your phone on home Wi-Fi, set `WEB_BIND=0.0.0.0` in `.env`, run `docker compose up -d web`, and open `http://<this computer's IP>:3010`. Plain HTTP on Wi-Fi sends the password unencrypted; HTTPS arrives with notifications in Phase 4.
 
 ## Run it
@@ -79,7 +81,7 @@ Each dataset in `/api/v1/sources` reports data freshness and collector status se
 | `market_closed` | Gold market is closed and the data covers the close. |
 | `unavailable` | Nothing verified has been stored. |
 
-- Live spot: stale after 5 minutes while the market is open (Sunday 18:00 to Friday 17:00 New York, daily break 17:00–18:00).
+- Live spot: stale after 35 minutes while the market is open (cloud runs are 30 minutes apart) (Sunday 18:00 to Friday 17:00 New York, daily break 17:00–18:00).
 - Nepal: expected every Sunday–Friday by 12:00 NPT. A missed day is stale and notes a possible public holiday.
 - NRB: yesterday's rate stays fresh until 18:00 NPT, because NRB sometimes publishes late.
 - FRED: fresh up to 3 US business days behind.

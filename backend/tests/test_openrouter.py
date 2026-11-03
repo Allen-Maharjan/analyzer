@@ -30,7 +30,7 @@ def test_missing_key_never_sends_request(monkeypatch):
 def test_free_selection_zero_ceiling_and_model_record(monkeypatch):
     monkeypatch.setenv('GA_OPENROUTER_API_KEY', 'test-secret')
     calls = []
-    def request(path, key, payload=None):
+    def request(path, key, payload=None, timeout=45):
         calls.append((path, payload))
         if path == '/models':
             return {'data': [model()]}
@@ -45,7 +45,7 @@ def test_free_selection_zero_ceiling_and_model_record(monkeypatch):
 def test_rate_limited_models_never_fall_back_to_paid(monkeypatch):
     monkeypatch.setenv('GA_OPENROUTER_API_KEY', 'test-secret')
     calls = []
-    def request(path, key, payload=None):
+    def request(path, key, payload=None, timeout=45):
         calls.append(payload)
         if path == '/models':
             return {'data': [model(), model('org/paid')]}
@@ -66,7 +66,7 @@ def test_runner_result_contract_accepts_discovered_id_and_rejects_paid():
 
 def test_unexpected_provider_model_is_rejected(monkeypatch):
     monkeypatch.setenv('GA_OPENROUTER_API_KEY', 'test-secret')
-    def request(path, key, payload=None):
+    def request(path, key, payload=None, timeout=45):
         if path == '/models':
             return {'data': [model()]}
         return {'model': 'org/paid', 'choices': [{'message': {'content': '{}'}}]}

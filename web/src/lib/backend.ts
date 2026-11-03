@@ -7,6 +7,15 @@ export type Reason = components["schemas"]["ReasonOut"];
 
 const BASE = process.env.GA_API_URL ?? "http://localhost:8010";
 
+/** Shared secret the cloud API requires; empty for the local Docker stack. */
+function withToken(init?: RequestInit): RequestInit {
+  const token = process.env.GA_INTERNAL_TOKEN;
+  if (!token) return withToken(init);
+  const headers = new Headers(init?.headers);
+  headers.set("x-internal-token", token);
+  return { cache: "no-store", ...init, headers };
+}
+
 export class BackendError extends Error {
   constructor(
     public status: number,
@@ -19,7 +28,7 @@ export class BackendError extends Error {
 export async function backend<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${BASE}${path}`, { cache: "no-store", ...init });
+    response = await fetch(`${BASE}${path}`, withToken(init));
   } catch {
     throw new BackendError(503, "The analysis service isn't reachable.");
   }
@@ -46,7 +55,7 @@ export async function backendOrNull<T>(path: string): Promise<T | null> {
 /** Forward a state-changing request from a route handler, preserving status and body. */
 export async function forward(path: string, init: RequestInit): Promise<Response> {
   try {
-    const response = await fetch(`${BASE}${path}`, { cache: "no-store", ...init });
+    const response = await fetch(`${BASE}${path}`, withToken(init));
     const body = await response.text();
     return new Response(body, {
       status: response.status,
