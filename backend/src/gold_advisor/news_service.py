@@ -39,6 +39,29 @@ def enqueue(session: Session, asset: AssetDefinition, trigger: str, dedupe_key: 
     return session.execute(stmt).first() is not None
 
 
+# News also refreshes on a timer, so afternoon headlines appear without waiting for tomorrow's
+# Nepal price. Budget: 2 assets x 8 refreshes x at most 20 requests = 320 of the 5,000 daily requests.
+SCHEDULED_EVERY = timedelta(hours=3)
+
+
+def enqueue_scheduled(session: Session, now: datetime, every: timedelta = SCHEDULED_EVERY) -> list[str]:
+    """Queue a refresh for each asset whose newest refresh job (any trigger, any outcome) is older
+    than ``every``. Idempotent within a time bucket."""
+    queued = []
+    bucket = int(now.timestamp() // every.total_seconds())
+    for asset in ASSETS.values():
+        if not asset.news_terms:
+            continue
+        newest = session.scalar(
+            select(func.max(NewsRefreshJobRow.created_at)).where(NewsRefreshJobRow.asset_id == asset.id)
+        )
+        if newest is not None and now - newest < every:
+            continue
+        if enqueue(session, asset, "scheduled", f"scheduled:{bucket}", now):
+            queued.append(asset.id)
+    return queued
+
+
 def today_prices(session: Session, rate_date) -> dict[str, float]:
     """Today's per-tola Nepal price for each metal asset, as stored right now."""
     out = {}

@@ -30,7 +30,7 @@ def test_empty_current_year_is_a_schema_error():
     class Client:
         pass
 
-    def fake_get(client, url, params):
+    def fake_get(client, url, params, timeout=None):
         return type("R", (), {"text": "<html></html>"})()
 
     original = us_releases.get_with_retries

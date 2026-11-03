@@ -49,11 +49,12 @@ def get_with_retries(
     attempts: int = 3,
     base_delay: float = 1.0,
     sleep=time.sleep,
+    timeout: float | None = None,  # per-request override for slow pages
 ) -> httpx.Response:
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
-            response = client.get(url, params=params)
+            response = client.get(url, params=params, timeout=timeout) if timeout else client.get(url, params=params)
         except httpx.TransportError as exc:
             last_error = exc
             delay = base_delay * 2 ** (attempt - 1)

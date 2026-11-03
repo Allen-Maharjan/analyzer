@@ -31,7 +31,7 @@ CANDLE_TIMEFRAMES = (Timeframe.M15, Timeframe.H1, Timeframe.D1)
 
 # What counts as "significant" for the AI step.
 AI_WORLD_MOVE = 0.01  # world price moved at least 1% since the last AI run
-AI_MAX_SILENCE = timedelta(hours=12)  # refresh at least twice a day
+AI_MAX_SILENCE = timedelta(hours=4)  # refresh at least every 4 h (OpenRouter free: ~50 requests/day; cap below)
 AI_DAILY_CAP = 12
 
 
@@ -109,7 +109,7 @@ def _significance(session, asset: AssetDefinition, now: datetime) -> str | None:
     if last is None:
         return "first AI analysis"
     if now - last.created_at >= AI_MAX_SILENCE:
-        return "no AI analysis for 12 hours"
+        return f"no AI analysis for {AI_MAX_SILENCE.total_seconds() / 3600:.0f} hours"
     old = session.get(AnalysisSnapshotRow, last.snapshot_id)
     if old is None:
         return "previous analysis missing"
@@ -168,11 +168,16 @@ def ai_if_significant(asset: AssetDefinition, now: datetime) -> None:
 
 
 def news() -> None:
-    """Run queued news refreshes (queued when today's Nepal price changes, or from the dashboard)."""
+    """Run queued news refreshes: queued when today's Nepal price changes, from the dashboard, or
+    every 3 hours on a timer."""
     from gold_advisor import news_service
     from gold_advisor.config import get_settings
 
     try:
+        with session_scope() as session:
+            queued = news_service.enqueue_scheduled(session, datetime.now(UTC))
+        if queued:
+            log.info("news: scheduled refresh queued for %s", ", ".join(queued))
         for line in news_service.process_pending(session_scope, get_settings().freenewsapi_key, lambda: datetime.now(UTC)):
             log.info(line)
     except Exception as exc:  # noqa: BLE001 - news is optional; never fail the cycle for it

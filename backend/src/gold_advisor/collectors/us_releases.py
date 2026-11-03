@@ -22,6 +22,11 @@ from gold_advisor.collectors.types import SourceSchemaError
 from gold_advisor.domain import UTC, Source
 
 URL = "https://fred.stlouisfed.org/releases/calendar"
+# FRED's calendar pages are large (~70 KB) and sometimes slow from GitHub's runners; the default
+# 20 s timed out there. Next year's schedule is usually published in the autumn, so it is only
+# fetched from September.
+PAGE_TIMEOUT = 60.0
+NEXT_YEAR_FROM_MONTH = 9
 
 
 @dataclass(frozen=True)
@@ -84,8 +89,9 @@ def fetch(client: httpx.Client, today: date) -> list[ScheduledEvent]:
     An empty page for the current year means the layout changed."""
     events: list[ScheduledEvent] = []
     for release in RELEASES:
-        for year in (today.year, today.year + 1):
-            html = get_with_retries(client, URL, params={"rid": release.rid, "y": year, "view": "year"}).text
+        years = (today.year, today.year + 1) if today.month >= NEXT_YEAR_FROM_MONTH else (today.year,)
+        for year in years:
+            html = get_with_retries(client, URL, params={"rid": release.rid, "y": year, "view": "year"}, timeout=PAGE_TIMEOUT).text
             found = parse(html, release)
             if year == today.year and not found:
                 raise SourceSchemaError(f"fred calendar: no {release.event_type} dates for {year}; page layout may have changed")
