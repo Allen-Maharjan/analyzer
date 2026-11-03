@@ -15,11 +15,13 @@ import {
 import { useEffect, useRef } from "react";
 
 type Candle = { bucket_start: string; open: number; high: number; low: number; close: number };
-type Level = { id: string; price: number; kind: string; manual: boolean };
+/** A horizontal level: support below the price, resistance above, or the owner's watch level. */
+export type ChartLevel = { id: string; price: number; kind: "support" | "resistance" | "watch"; manual: boolean };
 export type IndicatorPoint = { bucket_start: string; values: Record<string, number | null> };
 
 /** Things drawn on top of the candles. */
 export const OVERLAYS = [
+  { id: "levels", label: "Support & resistance" },
   { id: "averages", label: "50 & 200 averages" },
   { id: "bollinger", label: "Bollinger bands" },
 ] as const;
@@ -103,6 +105,7 @@ const PANEL_SPECS: Record<PanelId, PanelSpec> = {
 };
 
 const OVERLAY_LINES: Record<OverlayId, Line[]> = {
+  levels: [], // drawn as price lines, see below
   averages: [
     { field: "sma_50", color: ACCENT, width: 2, name: "50 avg" },
     { field: "sma_200", color: INK_2, width: 2, name: "200 avg" },
@@ -126,7 +129,7 @@ export function CandleChart({
   panels = [],
 }: {
   candles: Candle[];
-  levels: Level[];
+  levels: ChartLevel[];
   timeframe: string;
   label: string;
   indicators?: IndicatorPoint[];
@@ -170,14 +173,26 @@ export function CandleChart({
     candleSeries.setData(
       candles.map((c) => ({ time: time(c.bucket_start), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) })),
     );
+    // Support (green) and resistance (red) as dashed lines labelled on the price axis; the
+    // owner's watch level as a solid ochre line. Toggled with the "Support & resistance" chip.
+    const LEVEL_STYLE = {
+      support: { color: BUY, style: LineStyle.Dashed, title: "S" },
+      resistance: { color: WAIT, style: LineStyle.Dashed, title: "R" },
+      watch: { color: ACCENT, style: LineStyle.Solid, title: "Watch" },
+    } as const;
+    const showLevels = overlays.includes("levels");
+    const rank = { support: 0, resistance: 0, watch: 0 };
     for (const level of levels) {
+      if (!showLevels && level.kind !== "watch") continue;
+      const look = LEVEL_STYLE[level.kind] ?? LEVEL_STYLE.support;
+      rank[level.kind] += 1; // levels arrive nearest first: S1 is the closest support, R1 the closest resistance
       candleSeries.createPriceLine({
         price: level.price,
-        color: level.manual ? ACCENT : QUIET,
-        lineWidth: 1,
-        lineStyle: level.manual ? LineStyle.Solid : LineStyle.Dotted,
-        axisLabelVisible: false,
-        title: "",
+        color: look.color,
+        lineWidth: level.kind === "watch" ? 1 : 2,
+        lineStyle: look.style,
+        axisLabelVisible: true,
+        title: level.kind === "watch" ? look.title : `${look.title}${rank[level.kind]}`,
       });
     }
 
@@ -295,7 +310,7 @@ export function CandleChart({
     };
     // shownPanels/shownOverlays are derived from props; join them so the effect reruns on real changes only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join()]);
+  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join(), overlays.includes("levels")]);
 
   const described = [...shownOverlays.map((o) => OVERLAYS.find((x) => x.id === o)?.label), ...shownPanels.map((p) => PANEL_SPECS[p].title)].filter(Boolean);
   return (

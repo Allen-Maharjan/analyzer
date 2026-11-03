@@ -330,6 +330,20 @@ def collect_events() -> CollectionResult:
     return run_job("federal_reserve.fomc", Source.FEDERAL_RESERVE, work)
 
 
+def collect_us_releases() -> CollectionResult:
+    """US inflation (CPI), jobs (NFP) and PCE release dates. Separate job so a FRED page change
+    never stops the FOMC calendar."""
+    from gold_advisor.collectors import us_releases
+
+    def work() -> CollectionResult:
+        with make_client() as client:
+            events = us_releases.fetch(client, _now().date())
+        with session_scope() as session:
+            return repository.save_events(session, events)
+
+    return run_job("fred.release_calendar", Source.FRED, work)
+
+
 # --- Analysis ----------------------------------------------------------------------------
 
 

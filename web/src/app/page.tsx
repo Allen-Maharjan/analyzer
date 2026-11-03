@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-import { AppShell, ErrorState, Section } from "@/components/AppShell";
+import { AppShell, CardGrid, ErrorState, Section } from "@/components/AppShell";
 import { DecisionLabel, decisionStyle } from "@/components/Decision";
 import { NepalPriceChart } from "@/components/NepalPriceChart";
 import { PlanActions } from "@/components/PlanActions";
@@ -68,6 +68,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const previousPoint = history.length >= 2 ? history[history.length - 2] : null;
   const previous = previousPoint?.price ?? null;
   const change = previous != null && d.prices.nepal_per_tola != null ? d.prices.nepal_per_tola - previous : null;
+  const next = d.prices.nepal_next ?? null;
+  const nextChange = next && d.prices.nepal_per_tola != null ? next.estimate - d.prices.nepal_per_tola : 0;
   const sourceNames = Object.fromEntries(d.sources.map(s => [s.dataset, s.dataset === "usd_npr" ? "Dollar rate" : s.dataset.startsWith("nepal_") ? `Nepal ${label}` : s.dataset.endsWith("_spot") ? `World ${label}` : s.dataset]));
   const sources = d.sources.filter(s => s.dataset === "usd_npr" || s.dataset.startsWith("nepal_") || s.dataset.endsWith("_spot"));
   const problems = sources.filter((s) => s.status === "stale" || s.status === "unavailable");
@@ -112,6 +114,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </p>
       )}
 
+      <CardGrid>
       <Section title={`Nepal ${label}, per tola`}>
         {d.prices.nepal_per_tola == null ? (
           <p className="text-ink-2">Not collected yet.</p>
@@ -132,6 +135,25 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                 </>
               )}
             </p>
+            {next && (
+              <div className="mt-4 rounded-xl border border-line bg-ground px-4 py-3">
+                <p className="text-sm text-ink-2">
+                  Expected at Nepal&apos;s next update · <span className="num">{nepalTime(next.publish_at)}</span>
+                </p>
+                <p className="num mt-0.5 text-lg font-semibold">
+                  about {rupees(next.estimate)}
+                  {nextChange !== 0 && (
+                    <span className={`ml-2 whitespace-nowrap text-sm font-medium ${nextChange > 0 ? "text-buy" : "text-wait"}`}>
+                      {nextChange > 0 ? "up" : "down"} {rupees(Math.abs(nextChange))}
+                    </span>
+                  )}
+                </p>
+                <p className="num text-xs leading-relaxed text-ink-2">
+                  Likely between {rupees(next.low)} and {rupees(next.high)} (about 8 in 10 times). Based on how world {label} and the dollar
+                  have moved since today&apos;s price was set.
+                </p>
+              </div>
+            )}
             <div className="mt-5">
               <NepalPriceChart points={history} />
             </div>
@@ -161,7 +183,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
         {d.next_event && (
           <p className="mt-3 text-[15px] text-ink-2">
-            Next big US announcement: {d.next_event.title.replace(/\s*\(.*\)$/, "")}, {nepalTime(d.next_event.scheduled_at)}.
+            Next big US announcement: {d.next_event.title.replace(/\s*\((?:[A-Z][a-z]+ \d{4})\)$/, "")}, {nepalTime(d.next_event.scheduled_at)}.
+            {d.next_event.forces_wait === false ? " It can move prices sharply either way." : ""}
           </p>
         )}
       </Section>
@@ -238,6 +261,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </p>
         <PlanActions key={asset} plan={plan} asset={asset} label={label} />
       </Section>
+      </CardGrid>
 
       <footer className="mt-6 px-1 text-xs leading-relaxed text-ink-2">
         <p className="num">Advice updated {stamp(d.created_at)}.</p>

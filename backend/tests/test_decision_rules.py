@@ -85,3 +85,19 @@ def test_small_slide_or_silver_does_not_use_the_drop_from_high():
     assert decide(inputs(lag=small, h4_stabilized=True)).decision is Decision.WATCH_CLOSELY
     big = lag(nepal_change_3_publications=25, nepal_change_3_publications_pct=0.007, recent_high=4440, drawdown_from_high_pct=-0.17)
     assert decide(inputs(lag=big, h4_stabilized=True, asset=ASSETS["silver"])).decision is Decision.WATCH_CLOSELY
+
+
+def test_buy_turns_into_wait_when_tomorrow_is_expected_cheaper():
+    buy_setup = dict(lag=lag(nepal_change_3_publications=-6000, nepal_change_3_publications_pct=-0.021), h4_stabilized=True)
+    result = decide(inputs(**buy_setup, next_price=272000, next_price_change_pct=-0.0084))
+    assert result.decision is Decision.WAIT and result.rule == "expected_lower_next"
+    assert any("Rs 2,300 lower" in r.plain for r in result.reasons)
+    # A small expected dip (under 0.5%) does not block buying.
+    assert decide(inputs(**buy_setup, next_price=273500, next_price_change_pct=-0.0029)).decision is Decision.BUY
+
+
+def test_us_data_release_is_a_risk_not_a_wait():
+    result = decide(inputs(lag=lag(nepal_change_3_publications=-6000, nepal_change_3_publications_pct=-0.021), h4_stabilized=True,
+                           next_release_title="US jobs report (NFP)", hours_to_next_release=6.0))
+    assert result.decision is Decision.BUY
+    assert any("US jobs report" in r for r in result.downside_risks)

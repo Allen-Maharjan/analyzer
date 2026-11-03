@@ -17,11 +17,12 @@ JOBS = {
     "fx": jobs.collect_fx,
     "macro": jobs.collect_macro,
     "events": jobs.collect_events,
+    "us-releases": jobs.collect_us_releases,
     "analysis": jobs.run_analysis,
     **{f"candles-{tf.value}": (lambda tf=tf: jobs.collect_candles(tf)) for tf in COLLECTED_TIMEFRAMES},
 }
 # Daily first so long-horizon context is available soonest; 15m last.
-BACKFILL_ORDER = ["gold-spot", "nepal-today", "nepal-history", "fx", "macro", "events", "candles-1D", "candles-1h", "candles-15m", "analysis"]
+BACKFILL_ORDER = ["gold-spot", "nepal-today", "nepal-history", "fx", "macro", "events", "us-releases", "candles-1D", "candles-1h", "candles-15m", "analysis"]
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -487,6 +487,19 @@ class PricePointOut(BaseModel):
     price: float
 
 
+class NepalNextOut(BaseModel):
+    """Nepal's expected price at its next publication, with an 80% likely range."""
+
+    publish_at: datetime
+    estimate: float
+    low: float
+    high: float
+    hours_ahead: float
+    market_hours_ahead: float
+    change_pct: float = 0.0
+    basis: str
+
+
 class PriceSummaryOut(BaseModel):
     nepal_per_tola: float | None
     nepal_date: date | None
@@ -497,6 +510,7 @@ class PriceSummaryOut(BaseModel):
     world_price_source: str
     usd_npr: float | None
     changes: dict[str, float | None]
+    nepal_next: NepalNextOut | None = None
 
 
 class SourceStatusOut(BaseModel):
@@ -509,6 +523,7 @@ class NextEventOut(BaseModel):
     title: str
     scheduled_at: datetime
     hours_away: float
+    forces_wait: bool = True  # FOMC decisions force WAIT within 24 h; US data releases are shown as a risk only
 
 
 class ForecastSummaryOut(BaseModel):
@@ -619,6 +634,7 @@ def dashboard(session: SessionDep, asset: AssetDep) -> DashboardOut:
             world_price_source=p["prices"]["world_usd_source"],
             usd_npr=p["prices"]["usd_npr_mid"],
             changes=p["prices"]["changes"],
+            nepal_next=p["prices"].get("nepal_next"),
         ),
         next_event=p["next_event"],
         forecasts=[

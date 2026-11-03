@@ -117,6 +117,7 @@ def process_news() -> None:
 @locked("events", ttl_seconds=900)
 def collect_events() -> None:
     _quiet(jobs.collect_events)
+    _quiet(jobs.collect_us_releases)
 
 
 @app.task(name="analysis.run")

@@ -204,6 +204,16 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
         .limit(1)
     ).first()
     hours_to_event = (next_event.scheduled_at - now).total_seconds() / 3600 if next_event else None
+    # Soonest announcement of any kind (FOMC, or US CPI / jobs / PCE). Shown to the owner; only
+    # "major" (FOMC) events force WAIT.
+    next_announcement = session.scalars(
+        select(EconomicEventRow)
+        .where(EconomicEventRow.importance.in_(("major", "high")), EconomicEventRow.scheduled_at > now - timedelta(hours=1))
+        .order_by(EconomicEventRow.scheduled_at)
+        .limit(1)
+    ).first()
+    hours_to_announcement = (next_announcement.scheduled_at - now).total_seconds() / 3600 if next_announcement else None
+    next_release = next_announcement if next_announcement is not None and next_announcement.importance == "high" else None
     components["event_risk"] = score.event_risk(score.base_direction(components), hours_to_event)
     deterministic, coverage = score.combine(components)
 
@@ -242,6 +252,10 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
     fx_mid = pd.Series({pd.Timestamp(d): (float(b) + float(s)) / 2 for d, b, s in fx_rows}).sort_index()
     lag = nepal.analyse(publications, xau_by_end, fx_mid, price_now) if len(fx_mid) else nepal.analyse([], xau_by_end, pd.Series([1.0]), None)
 
+    # Nepal's expected next price. Hourly volatility from the last ~5 days of completed 1h bars.
+    hourly_vol = float(np.log(h1["close"]).diff().tail(120).std()) if len(h1) > 30 else None
+    nepal_next = nepal.forecast_next(lag, now, hourly_vol, asset.calendar.is_open, asset.nepal_price_step)
+
     # Nepal-equivalent rupees per tola for one US$/oz of world price, using the usual premium.
     rupee_factor = (
         float(fx_mid.iloc[-1]) * nepal.OUNCES_PER_TOLA * (1 + lag.premium_mean)
@@ -277,6 +291,10 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
             coverage=coverage,
             waiting_days=waiting_days,
             asset=asset,
+            next_price=nepal_next.estimate if nepal_next else None,
+            next_price_change_pct=nepal_next.change_pct if nepal_next else None,
+            next_release_title=next_release.title if next_release else None,
+            hours_to_next_release=hours_to_announcement if next_release else None,
         )
     )
 
@@ -301,6 +319,7 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
                 "reference_per_tola_now": lag.reference_now,
                 "changes": _changes(bars[Timeframe.D1], price_now),
                 "nepal_history": [{"date": p.rate_date, "price": p.price} for p in reversed(publications[:30])],
+                "nepal_next": nepal_next,
             },
             "nepal_lag": lag,
             "score": {
@@ -318,8 +337,13 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
             "price_levels": price_levels,
             "forecasts": forecasts,
             "rupees_per_usd_oz": rupee_factor,
-            "next_event": {"title": next_event.title, "scheduled_at": next_event.scheduled_at, "hours_away": hours_to_event}
-            if next_event
+            "next_event": {
+                "title": next_announcement.title,
+                "scheduled_at": next_announcement.scheduled_at,
+                "hours_away": hours_to_announcement,
+                "forces_wait": next_announcement.importance == "major",
+            }
+            if next_announcement
             else None,
             "sources": [asdict(d) for d in datasets.values()],
             "watch_levels": watch_levels,

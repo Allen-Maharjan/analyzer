@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 
-import { CandleChart, OVERLAYS, PANELS, type IndicatorPoint, type OverlayId, type PanelId } from "@/components/CandleChart";
+import { CandleChart, OVERLAYS, PANELS, type ChartLevel, type IndicatorPoint, type OverlayId, type PanelId } from "@/components/CandleChart";
 import { nepalTime, usd } from "@/lib/format";
 
 type Candle = { bucket_start: string; open: number; high: number; low: number; close: number };
-type Level = { id: string; price: number; kind: string; manual: boolean };
 type Quote = { price: string | number; source: string; observed_at: string; freshness: { status: string } };
 type Timeframe = "15m" | "1h" | "1D";
 const OPTIONS: { value: Timeframe; label: string }[] = [
@@ -15,9 +14,9 @@ const OPTIONS: { value: Timeframe; label: string }[] = [
   { value: "1D", label: "1 day" },
 ];
 const SOURCE_NAMES: Record<string, string> = { gold_api: "Gold API", swissquote: "Swissquote" };
-const DEFAULT_OVERLAYS: OverlayId[] = ["averages"];
+const DEFAULT_OVERLAYS: OverlayId[] = ["levels", "averages"];
 const DEFAULT_PANELS: PanelId[] = ["rsi", "macd"];
-const STORAGE_KEY = "chart-indicators-v1";
+const STORAGE_KEY = "chart-indicators-v2"; // v2 added support & resistance (on by default)
 
 /** Remember which indicators the owner turned on. Browser storage can be unavailable; then use defaults. */
 function loadChoice(): { overlays: OverlayId[]; panels: PanelId[] } {
@@ -49,7 +48,7 @@ function Chip({ on, label, onClick }: { on: boolean; label: string; onClick: () 
 }
 
 export function WorldChart({ asset, label, initialCandles, levels }: {
-  asset: string; label: string; initialCandles: Candle[]; levels: Level[];
+  asset: string; label: string; initialCandles: Candle[]; levels: Record<Timeframe, ChartLevel[]>;
 }) {
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [series, setSeries] = useState<{ timeframe: Timeframe; candles: Candle[] }>({ timeframe: "15m", candles: initialCandles });
@@ -171,7 +170,7 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
       {candles.length > 0 ? (
         <CandleChart
           candles={candles}
-          levels={levels}
+          levels={levels[timeframe] ?? []}
           timeframe={timeframe}
           label={label}
           indicators={points}
@@ -188,7 +187,8 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
         {indicatorError && candles.length ? " Indicators could not be loaded right now." : ""}
       </p>
       <p className="mt-1 text-sm text-ink-2">
-        Dotted lines show daily support and resistance from the saved analysis; a solid line marks a watch level. Indicators use the same
+        Green dashed lines (S1, S2) are support, prices where falls have tended to stop; red dashed lines (R1, R2) are resistance,
+        where rises have tended to stall. S1 and R1 are the nearest, for the timeframe shown. A solid ochre line marks your watch level. Indicators use the same
         bars as the chart; dashed lines in the panels mark their usual thresholds (for example RSI 30 and 70). Tap or hover to read values.
       </p>
     </div>

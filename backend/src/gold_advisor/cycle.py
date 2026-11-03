@@ -24,6 +24,7 @@ log = logging.getLogger("cycle")
 SLOW_JOBS = {
     "fred.yields": (timedelta(hours=6), jobs.collect_macro),
     "federal_reserve.fomc": (timedelta(hours=6), jobs.collect_events),
+    "fred.release_calendar": (timedelta(hours=24), jobs.collect_us_releases),
     "fenegosida.history": (timedelta(hours=24), lambda: jobs.collect_nepal_history(2)),
 }
 CANDLE_TIMEFRAMES = (Timeframe.M15, Timeframe.H1, Timeframe.D1)

@@ -24,8 +24,12 @@ GitHub Actions (cron :00 and :30 Nepal time, Sunday–Friday, timezone Asia/Kath
             1. collect   world spot + 15m/1h/1D candles per asset, only while the world market is
                          open or closed < 1 h ago (no chart updates over the weekend), then
                          Nepal today, NRB USD/NPR
-                         FRED and FOMC every 6 h, Nepal history daily (gated by last success)
-            2. analyse   one immutable snapshot per asset (gold, silver)
+                         FRED and FOMC every 6 h, US CPI/jobs/PCE release dates (FRED calendar)
+                         daily, Nepal history daily (gated by last success)
+            2. analyse   one immutable snapshot per asset (gold, silver), including Nepal's
+                         expected next price (decision/nepal.py forecast_next: today's gap
+                         carried forward; Nepal follows the ~9:45 am NPT world price) and its
+                         80% range. Only FOMC forces WAIT; US data releases are listed as risks.
             3. AI        only if significant: advice changed, new Nepal publication,
                          world price moved >= 1% since the last AI run, or 12 h without AI.
                          Max 12 automatic runs per asset per Nepal day.

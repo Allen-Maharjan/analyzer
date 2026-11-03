@@ -89,6 +89,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Indicator Series */
+        get: operations["indicator_series_api_v1_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/nepal-rates": {
         parameters: {
             query?: never;
@@ -559,6 +576,28 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** IndicatorPointOut */
+        IndicatorPointOut: {
+            /**
+             * Bucket Start
+             * Format: date-time
+             */
+            bucket_start: string;
+            /** Values */
+            values: {
+                [key: string]: number | null;
+            };
+        };
+        /** IndicatorSeriesOut */
+        IndicatorSeriesOut: {
+            /** Instrument */
+            instrument: string;
+            timeframe: components["schemas"]["Timeframe"];
+            /** Fields */
+            fields: string[];
+            /** Points */
+            points: components["schemas"]["IndicatorPointOut"][];
+        };
         /** LocalRateOut */
         LocalRateOut: {
             /**
@@ -601,6 +640,34 @@ export interface components {
          * @enum {string}
          */
         Metal: "gold" | "silver";
+        /**
+         * NepalNextOut
+         * @description Nepal's expected price at its next publication, with an 80% likely range.
+         */
+        NepalNextOut: {
+            /**
+             * Publish At
+             * Format: date-time
+             */
+            publish_at: string;
+            /** Estimate */
+            estimate: number;
+            /** Low */
+            low: number;
+            /** High */
+            high: number;
+            /** Hours Ahead */
+            hours_ahead: number;
+            /** Market Hours Ahead */
+            market_hours_ahead: number;
+            /**
+             * Change Pct
+             * @default 0
+             */
+            change_pct: number;
+            /** Basis */
+            basis: string;
+        };
         /** NewsAiOut */
         NewsAiOut: {
             /** Summary */
@@ -708,6 +775,11 @@ export interface components {
             scheduled_at: string;
             /** Hours Away */
             hours_away: number;
+            /**
+             * Forces Wait
+             * @default true
+             */
+            forces_wait: boolean;
         };
         /** PlanOut */
         PlanOut: {
@@ -748,6 +820,7 @@ export interface components {
             changes: {
                 [key: string]: number | null;
             };
+            nepal_next?: components["schemas"]["NepalNextOut"] | null;
         };
         /** ReasonOut */
         ReasonOut: {
@@ -976,6 +1049,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CandleSeriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    indicator_series_api_v1_indicators_get: {
+        parameters: {
+            query: {
+                timeframe: components["schemas"]["Timeframe"];
+                limit?: number;
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorSeriesOut"];
                 };
             };
             /** @description Validation Error */

@@ -8,7 +8,8 @@ Rules apply in strict precedence (first match wins):
 3. BUY when Nepal has come down (at least Rs 3,000/tola or 1% across the latest three
    publications, or, where the asset enables it, at least 5% below its highest of the last 20
    publications), the expected Nepal adjustment has cleared, and two completed 4-hour candles
-   show no new selloff low with improving RSI or MACD.
+   show no new selloff low with improving RSI or MACD. If all that holds but Nepal's next price is
+   expected at least 0.5% lower (the next-price forecast), WAIT for it instead.
 4. WATCH CLOSELY otherwise.
 
 Every result carries plain text for a non-trader and separate technical detail.
@@ -20,7 +21,7 @@ from gold_advisor.assets import AssetDefinition, GOLD
 from gold_advisor.decision.nepal import NepalLag
 from gold_advisor.domain import Confidence, Decision, Outlook
 
-VERSION = "rules-2"
+VERSION = "rules-3"
 WAIT_EVENT_HOURS = 24
 WAIT_INTL_DECLINE = -0.02
 BUY_DROP_RUPEES = -3000
@@ -48,6 +49,10 @@ class DecisionInputs:
     coverage: float
     waiting_days: float | None
     asset: AssetDefinition = GOLD
+    next_price: float | None = None  # Nepal's expected next price (forecast), rupees per tola
+    next_price_change_pct: float | None = None  # vs the latest published price
+    next_release_title: str | None = None  # next US data release (CPI, jobs, PCE): a risk, not a WAIT trigger
+    hours_to_next_release: float | None = None
 
 
 @dataclass
@@ -140,9 +145,18 @@ def _dropped(lag: NepalLag, asset: AssetDefinition) -> tuple[bool, Reason | None
     return False, None
 
 
-def _lag_reason(lag: NepalLag) -> Reason | None:
+def _lag_reason(lag: NepalLag, inp: "DecisionInputs | None" = None) -> Reason | None:
     if lag.expected_adjustment_pct is None:
         return None
+    if inp is not None and inp.next_price is not None and inp.next_price_change_pct is not None and lag.adjustment_pending:
+        # Say the size of the move with the next-price forecast, the more accurate estimate.
+        change = inp.next_price - lag.latest.nepal_price
+        if abs(change) >= 1:
+            direction = "fall" if change < 0 else "rise"
+            return Reason(
+                f"Based on world prices, Nepal's price may {direction} by about {rupees(abs(change))} per tola at the next update.",
+                f"Next-price forecast {rupees(inp.next_price)} ({pct(inp.next_price_change_pct)}); gap vs usual: adjustment {pct(lag.expected_adjustment_pct)}.",
+            )
     adj = lag.expected_adjustment_pct
     detail = (
         f"Implied Nepal price {rupees(lag.implied_nepal_now or 0)} vs published {rupees(lag.latest.nepal_price)} "
@@ -171,9 +185,11 @@ def decide(inp: DecisionInputs) -> DecisionResult:
     downside = [f"World {inp.asset.label.lower()} could keep falling, and Nepal's price usually follows within a day or two."]
     if inp.next_event_title and inp.hours_to_next_major_event is not None and inp.hours_to_next_major_event < 24 * 7:
         downside.append(f"{inp.next_event_title} in about {inp.hours_to_next_major_event:.0f} hours can move prices sharply either way.")
+    if inp.next_release_title and inp.hours_to_next_release is not None and 0 <= inp.hours_to_next_release < 48:
+        downside.append(f"The {inp.next_release_title} in about {inp.hours_to_next_release:.0f} hours can move prices sharply either way.")
 
     def result(decision, rule, headline, summary, next_review, change) -> DecisionResult:
-        for r in (_nepal_reason(lag, inp.asset), _lag_reason(lag), _market_reason(inp)):
+        for r in (_nepal_reason(lag, inp.asset), _lag_reason(lag, inp), _market_reason(inp)):
             if r is not None and len(reasons) < 5 and r not in reasons:
                 reasons.append(r)
         review_due = bool(inp.waiting_days is not None and inp.waiting_days >= REVIEW_AFTER_DAYS and decision is not Decision.BUY)
@@ -269,6 +285,23 @@ def decide(inp: DecisionInputs) -> DecisionResult:
     # 3. Conditions to buy.
     dropped, slide_reason = _dropped(lag, inp.asset)
     if dropped and lag.adjustment_pending is False and inp.h4_stabilized:
+        limit = inp.asset.buy_block_expected_drop_pct
+        if limit is not None and inp.next_price_change_pct is not None and inp.next_price_change_pct <= limit and inp.next_price is not None:
+            reasons.append(
+                Reason(
+                    f"Nepal's next price is expected to be about {rupees(lag.latest.nepal_price - inp.next_price)} lower "
+                    f"({rupees(inp.next_price)} per tola).",
+                    f"Next-price forecast {pct(inp.next_price_change_pct)} vs today's published price; threshold {pct(limit)}.",
+                )
+            )
+            return result(
+                Decision.WAIT,
+                "expected_lower_next",
+                "Wait: tomorrow's price will probably be lower",
+                "Other signs point to buying, but world prices have slipped since Nepal set today's price. Waiting for the next update should be cheaper.",
+                "After Nepal's next price update (usually around 11 am).",
+                "Nepal publishing the lower price, after which buying may make sense.",
+            )
         if slide_reason is not None:
             reasons.append(slide_reason)
         reasons.append(Reason("World prices have stopped falling for now.", inp.h4_detail))
