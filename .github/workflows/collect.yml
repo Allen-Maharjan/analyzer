@@ -9,13 +9,10 @@ name: collect
 
 on:
   schedule:
-    # Every 30 minutes on Nepal time's :00 and :30 (11:00, 11:30, ... NPT), except Saturday
-    # in Nepal: no Nepal price is published and world gold is closed, so there is nothing new.
-    # Nepal is UTC+5:45, so NPT :00/:30 is UTC :15/:45. GitHub cron runs in UTC, and
-    # Nepal's Saturday is Friday 18:15 UTC to Saturday 18:15 UTC, hence three lines:
-    - cron: "15,45 * * * 0-4"   # Sunday-Thursday UTC, all day
-    - cron: "15,45 0-17 * * 5"  # Friday UTC until 18:15 (= Saturday 00:00 NPT)
-    - cron: "15,45 18-23 * * 6" # Saturday UTC from 18:15 (= Sunday 00:00 NPT)
+    # Every 30 minutes on Nepal time (11:00, 11:30, ...), Sunday to Friday. No runs on
+    # Saturday: no Nepal price is published and world gold is closed, so there is nothing new.
+    - cron: "0,30 * * * 0-5"
+      timezone: "Asia/Kathmandu"
   workflow_dispatch:
     inputs:
       force_daily:

@@ -14,7 +14,7 @@ Both modes are idempotent, so running them at the same time is safe but wasteful
 ## Cloud mode
 
 ```
-GitHub Actions (cron :15 and :45 UTC = :00 and :30 NPT, e.g. 11:00 and 11:30; or "Run workflow")
+GitHub Actions (cron :00 and :30 Nepal time, Sunday–Friday, timezone Asia/Kathmandu; or "Run workflow")
   No scheduled runs on Saturday, Nepal time (no Nepal publication, world market closed);
   a late run that lands on Nepal's Saturday skips itself. Manual runs always go ahead.
   └─ .github/workflows/collect.yml
