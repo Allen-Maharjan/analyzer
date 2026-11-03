@@ -36,3 +36,6 @@ packages = ["src/gold_advisor"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["integration: needs a running PostgreSQL/TimescaleDB (GA_TEST_DATABASE_URL)"]
+
+[tool.vercel]
+entrypoint = "src.gold_advisor.api:app"
