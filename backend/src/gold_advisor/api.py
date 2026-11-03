@@ -1,5 +1,14 @@
 """Read-only /api/v1 resources over collected data. Requests never trigger provider calls."""
 
+import sys
+from pathlib import Path
+
+# Vercel loads this file directly by path (pyproject [tool.vercel] entrypoint), without
+# installing the package. Make src/ importable so "gold_advisor.*" imports resolve.
+_SRC = str(Path(__file__).resolve().parent.parent)
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
+
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
