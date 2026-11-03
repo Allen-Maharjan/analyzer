@@ -8,8 +8,9 @@ name: collect
 
 on:
   schedule:
-    # Odd minutes: GitHub delays runs scheduled on the hour. UTC.
-    - cron: "7,37 * * * *"
+    # Every 30 minutes on Nepal time's :00 and :30 (11:00, 11:30, ... NPT).
+    # Nepal is UTC+5:45, so NPT :00/:30 is UTC :15/:45. GitHub cron runs in UTC.
+    - cron: "15,45 * * * *"
   workflow_dispatch: {}
 
 # Never run two cycles at once; a late run waits instead of overlapping.
