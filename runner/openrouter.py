@@ -3,6 +3,7 @@
 The key remains on the host runner. No paid model or web-search plugin is used.
 """
 import json
+import time
 import os
 import re
 import urllib.error
@@ -18,13 +19,13 @@ class OpenRouterError(RuntimeError):
     """A safe error suitable for displaying without provider response bodies."""
 
 
-def _request(path: str, key: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def _request(path: str, key: str, payload: dict[str, Any] | None = None, timeout: int = 45) -> dict[str, Any]:
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(API + path, data=data, headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json",
     })
     try:
-        with urllib.request.urlopen(request, timeout=45) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             result = json.load(response)
     except urllib.error.HTTPError as error:
         raise OpenRouterError(f"OpenRouter returned HTTP {error.code}.") from error
@@ -73,17 +74,25 @@ def run(prompt: str, schema: dict[str, Any]) -> dict[str, str]:
     models = free_models(_request("/models", key))
     if not models:
         raise OpenRouterError("No compatible free OpenRouter models are currently available.")
-    # Bound attempts: free endpoints can be rate limited or temporarily unavailable.
+    # Bound attempts: free endpoints can be rate limited or temporarily unavailable. The whole
+    # run must finish inside the API's 5-minute "running" window.
+    deadline = time.monotonic() + 270
     for model in models[:3]:
+        remaining = int(deadline - time.monotonic())
+        if remaining < 30:
+            break
         payload = {
             "model": model,
-            "max_tokens": 2048,
+            # Free models are mostly reasoning models: keep thinking short and leave room for the
+            # answer, or they stop at the token limit with empty content.
+            "max_tokens": 8000,
+            "reasoning": {"effort": "low", "exclude": True},
             "messages": [{"role": "user", "content": prompt}],
             "response_format": {"type": "json_schema", "json_schema": {"name": "analysis", "strict": True, "schema": schema}},
             "provider": {"require_parameters": True, "max_price": {"prompt": 0, "completion": 0}},
         }
         try:
-            response = _request("/chat/completions", key, payload)
+            response = _request("/chat/completions", key, payload, timeout=min(150, remaining))
             actual = response.get("model")
             if actual != model:
                 raise OpenRouterError("OpenRouter returned an unexpected model.")
