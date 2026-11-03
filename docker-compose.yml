@@ -9,6 +9,7 @@ x-backend: &backend
     GA_DATABASE_URL: ${NEON_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-gold}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-gold}}
     GA_REDIS_URL: redis://redis:6379/0
     GA_RUNNER_TOKEN: ${GA_RUNNER_TOKEN:-}
+    FREENEWSAPI_KEY: ${FREENEWSAPI_KEY:-}
   depends_on:
     db:
       condition: service_healthy

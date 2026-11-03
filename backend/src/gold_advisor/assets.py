@@ -38,6 +38,9 @@ class AssetDefinition:
     buy_drop_rupees: float | None = None
     buy_drop_pct: float = -0.01
     wait_decline_pct: float = -0.02
+    # News search (FreeNewsAPI in_title phrases) and the words a headline must contain.
+    news_terms: tuple[str, ...] = ()
+    news_keywords: tuple[str, ...] = ()
 
     @property
     def dataset_prefix(self) -> str:
@@ -64,10 +67,12 @@ ASSETS = {
     a.id: a for a in (
         AssetDefinition('gold', 'Gold', 'XAU/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAU', candle_symbol='xauusd',
-                        metal=Metal.GOLD, purity=Purity.HALLMARK, local_label='Hallmark gold', watch_levels=(4000.0,), buy_drop_rupees=-3000),
+                        metal=Metal.GOLD, purity=Purity.HALLMARK, local_label='Hallmark gold', watch_levels=(4000.0,), buy_drop_rupees=-3000,
+                        news_terms=('gold price', 'gold bullion', 'XAU USD'), news_keywords=('gold', 'xau', 'bullion', 'precious metal')),
         AssetDefinition('silver', 'Silver', 'XAG/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAG', candle_symbol='xagusd',
-                        metal=Metal.SILVER, purity=Purity.PURE_SILVER, local_label='Pure silver'),
+                        metal=Metal.SILVER, purity=Purity.PURE_SILVER, local_label='Pure silver',
+                        news_terms=('silver price', 'silver bullion', 'XAG USD'), news_keywords=('silver', 'xag', 'bullion', 'precious metal')),
     )
 }
 GOLD = ASSETS['gold']

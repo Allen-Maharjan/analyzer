@@ -65,13 +65,13 @@ export function WatchLevelsForm({ initial, asset }: { initial: number[]; asset: 
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Price"
-            className="num min-h-11 w-40 rounded-md border border-line bg-panel px-3 text-base placeholder:text-ink-2/70"
+            className="num min-h-11 w-40 rounded-xl border border-line bg-panel px-3 text-base placeholder:text-ink-2/70"
           />
         </label>
         <button
           type="submit"
           disabled={busy || !draft}
-          className="min-h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+          className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
         >
           Add
         </button>

@@ -45,7 +45,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </Section>
         <Section title="Account">
           <form action="/api/logout" method="post">
-            <button type="submit" className="min-h-11 rounded-md border border-line px-4 text-sm font-medium hover:bg-hover">
+            <button type="submit" className="min-h-11 rounded-xl border border-line px-4 text-sm font-medium hover:bg-hover">
               Sign out
             </button>
           </form>

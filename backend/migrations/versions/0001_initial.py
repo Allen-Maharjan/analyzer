@@ -5,6 +5,8 @@ Revises:
 Create Date: 2026-11-02
 """
 
+import os
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -30,9 +32,9 @@ def _revision() -> sa.Column:
 def upgrade() -> None:
     # TimescaleDB is optional: Neon and other hosted Postgres services don't offer it.
     bind = op.get_bind()
-    timescale = bind.execute(
-        sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb'")
-    ).scalar() is not None
+    timescale = os.environ.get("GA_SKIP_TIMESCALE") != "1" and (
+        bind.execute(sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb'")).scalar() is not None
+    )
     if timescale:
         op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb")
 

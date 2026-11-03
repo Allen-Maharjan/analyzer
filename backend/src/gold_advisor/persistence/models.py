@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    UniqueConstraint,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -217,3 +218,57 @@ class AiAnalysisRow(Base):
     validation: Mapped[dict | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (Index("ix_ai_analyses_created_at", "created_at"), Index("ix_ai_analyses_status", "status"))
+
+
+class NewsArticleRow(Base):
+    """A selected headline for one asset. The full article body is never stored."""
+
+    __tablename__ = "news_articles"
+    asset_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source: Mapped[str] = mapped_column(String(32), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    publisher: Mapped[str] = mapped_column(Text, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    excerpt: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    language: Mapped[str] = mapped_column(String(8), nullable=False, server_default="")
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (Index("ix_news_articles_asset_published", "asset_id", "published_at"),)
+
+
+class NewsRefreshJobRow(Base):
+    """Durable request to search news for one asset. ``dedupe_key`` makes enqueueing idempotent."""
+
+    __tablename__ = "news_refresh_jobs"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    trigger: Mapped[str] = mapped_column(String(32), nullable=False)  # price_inserted | price_revised | manual
+    dedupe_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)  # pending | running | succeeded | empty | failed
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    requests_used: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    article_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    error: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        UniqueConstraint("asset_id", "dedupe_key", name="uq_news_refresh_jobs_asset_id_dedupe_key"),
+        Index("ix_news_refresh_jobs_status", "status"),
+    )
+
+
+class NewsRiskRow(Base):
+    """The owner marked an article as a reason to wait. Only this, never AI output, can turn BUY into WAIT."""
+
+    __tablename__ = "news_risk_confirmations"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (Index("ix_news_risk_confirmations_asset_expires", "asset_id", "expires_at"),)

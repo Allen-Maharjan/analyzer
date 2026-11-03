@@ -6,7 +6,7 @@ export function AppShell({ children, asset = "gold" }: { children: React.ReactNo
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-10 border-b border-line bg-ground/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 py-2">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-2">
           <Nav asset={asset} />
           <RefreshButton />
         </div>

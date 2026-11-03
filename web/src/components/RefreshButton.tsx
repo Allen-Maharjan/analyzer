@@ -54,7 +54,7 @@ export function RefreshButton() {
       {state.kind !== "idle" && state.kind !== "busy" && (
         <p
           role="status"
-          className={`absolute right-0 top-full w-max max-w-[15rem] rounded-md border border-line bg-ground px-3 py-2 text-sm ${
+          className={`absolute right-0 top-full mt-1 w-max max-w-[15rem] rounded-xl border border-line bg-panel px-3 py-2 text-sm shadow-[0_4px_12px_rgb(28_25_23_/_0.10)] ${
             state.kind === "error" ? "text-wait" : "text-ink"
           }`}
         >

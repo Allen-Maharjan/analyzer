@@ -31,21 +31,21 @@ export function PlanActions({ plan, asset, label }: { plan: Plan; asset: string;
         ? "Mark the purchase as done? The app will stop counting waiting days."
         : "Start a new purchase plan? The waiting count goes back to zero.";
     return (
-      <div className="rounded-md border border-line p-4">
+      <div className="rounded-xl border border-line bg-ground p-4">
         <p className="text-sm">{text}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => send(confirming)}
-            className="min-h-11 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-60"
+            className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-60"
           >
             {confirming === "purchased" ? "Yes, I bought it" : "Yes, start over"}
           </button>
           <button
             type="button"
             onClick={() => setConfirming(null)}
-            className="min-h-11 rounded-md border border-line px-4 text-sm font-medium hover:bg-hover"
+            className="min-h-11 rounded-xl border border-line px-4 text-sm font-medium hover:bg-hover"
           >
             Cancel
           </button>
@@ -61,7 +61,7 @@ export function PlanActions({ plan, asset, label }: { plan: Plan; asset: string;
         <button
           type="button"
           onClick={() => setConfirming("purchased")}
-          className="min-h-11 rounded-md border border-line px-4 text-sm font-medium hover:bg-hover"
+          className="min-h-11 rounded-xl border border-line px-4 text-sm font-medium hover:bg-hover"
         >
           I bought {label}
         </button>
@@ -69,7 +69,7 @@ export function PlanActions({ plan, asset, label }: { plan: Plan; asset: string;
       <button
         type="button"
         onClick={() => setConfirming("restart")}
-        className="min-h-11 rounded-md px-4 text-sm font-medium text-ink-2 hover:bg-hover hover:text-ink"
+        className="min-h-11 rounded-xl px-4 text-sm font-medium text-ink-2 hover:bg-hover hover:text-ink"
       >
         Start a new plan
       </button>

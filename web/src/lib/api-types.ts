@@ -300,6 +300,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/news": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** News */
+        get: operations["news_api_v1_news_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/news/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** News Refresh */
+        post: operations["news_refresh_api_v1_news_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/news/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** News Risk Confirm */
+        post: operations["news_risk_confirm_api_v1_news_risk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/news/risk/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** News Risk Clear */
+        post: operations["news_risk_clear_api_v1_news_risk_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -429,6 +497,7 @@ export interface components {
             sources: components["schemas"]["SourceStatusOut"][];
             /** Forecasts */
             forecasts: components["schemas"]["ForecastSummaryOut"][];
+            news_risk?: components["schemas"]["NewsRiskOverrideOut"] | null;
         };
         /** ForecastSummaryOut */
         ForecastSummaryOut: {
@@ -532,6 +601,102 @@ export interface components {
          * @enum {string}
          */
         Metal: "gold" | "silver";
+        /** NewsAiOut */
+        NewsAiOut: {
+            /** Summary */
+            summary: string;
+            /** Cited */
+            cited: string[];
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+        };
+        /** NewsArticleOut */
+        NewsArticleOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Publisher */
+            publisher: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** Url */
+            url: string;
+            /** Excerpt */
+            excerpt: string;
+            /** Can Flag */
+            can_flag: boolean;
+        };
+        /** NewsOut */
+        NewsOut: {
+            status: components["schemas"]["NewsStatusOut"];
+            /** Articles */
+            articles: components["schemas"]["NewsArticleOut"][];
+            ai: components["schemas"]["NewsAiOut"] | null;
+            risk: components["schemas"]["NewsRiskOut"] | null;
+        };
+        /** NewsRiskIn */
+        NewsRiskIn: {
+            /** Article Id */
+            article_id: string;
+            /** Reason */
+            reason: string;
+        };
+        /** NewsRiskOut */
+        NewsRiskOut: {
+            /** Article Id */
+            article_id: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Confirmed At
+             * Format: date-time
+             */
+            confirmed_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * NewsRiskOverrideOut
+         * @description Present only when an owner-confirmed news risk changed BUY into WAIT.
+         */
+        NewsRiskOverrideOut: {
+            /** Original Decision */
+            original_decision: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Article Title */
+            article_title: string | null;
+            /** Article Publisher */
+            article_publisher: string | null;
+            /** Article Url */
+            article_url: string | null;
+        };
+        /** NewsStatusOut */
+        NewsStatusOut: {
+            /** State */
+            state: string;
+            /** Refreshed At */
+            refreshed_at: string | null;
+            /** Refreshing */
+            refreshing: boolean;
+            /** Last Attempt Failed */
+            last_attempt_failed: boolean;
+        };
         /** NextEventOut */
         NextEventOut: {
             /** Title */
@@ -1235,6 +1400,138 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_api_v1_news_get: {
+        parameters: {
+            query?: {
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_refresh_api_v1_news_refresh_post: {
+        parameters: {
+            query?: {
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_risk_confirm_api_v1_news_risk_post: {
+        parameters: {
+            query?: {
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewsRiskIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsRiskOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_risk_clear_api_v1_news_risk_clear_post: {
+        parameters: {
+            query?: {
+                asset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -1,0 +1,86 @@
+{
+ "data": [
+  {
+   "uuid": "5fcd6996-9941-4433-9579-a8a5b7a8585e",
+   "title": "Gold, silver prices today: Key factors investors should watch amid US-Iran tensions",
+   "published_at": "2026-11-03T02:04:33.000Z",
+   "publisher": "CNBC TV18"
+  },
+  {
+   "uuid": "5f480b16-5e7d-4bbb-b979-bd3059d9559a",
+   "title": "Silver Price Forecast: Oversold rebound faces $52.50 resistance",
+   "published_at": "2026-11-02T21:47:28.000Z",
+   "publisher": "FXStreet"
+  },
+  {
+   "uuid": "98c7342c-7156-4c21-90fe-d279981f10fe",
+   "title": "Silver Price Forecast: Bearish trend persists despite XAG/USD regaining $50 as Oil slides",
+   "published_at": "2026-11-02T16:40:07.000Z",
+   "publisher": "www.tmgm.com"
+  },
+  {
+   "uuid": "9219998e-a7c3-4ffc-a947-9cdd8d3037d3",
+   "title": "Gold, silver prices rebound from multi-month lows as crude oil retreats; what is driving the recovery?",
+   "published_at": "2026-11-02T16:38:06.000Z",
+   "publisher": "Livemint"
+  },
+  {
+   "uuid": "bdff1ca1-9ffa-4794-ab1a-9e440179377d",
+   "title": "Gold and silver prices surge after sharp selloff, India set to ramp up silver imports into 2027 – Heraeus",
+   "published_at": "2026-11-02T16:12:03.000Z",
+   "publisher": "KITCO"
+  },
+  {
+   "uuid": "01eea1df-9a44-4315-bb8a-98df8597514d",
+   "title": "Silver Price Forecast: XAG/USD reclaims $50 as Oil tumbles, bearish trend holds",
+   "published_at": "2026-11-02T16:09:59.000Z",
+   "publisher": "www.tmgm.com"
+  },
+  {
+   "uuid": "34e7be2a-2464-466d-8ae2-e7686bf537e4",
+   "title": "Silver Price Big Change: नहीं खरीद पाए सस्ती चांदी? MCX पर पलट गया गेम, लेकिन यहां अभी भी मौका",
+   "published_at": "2026-11-02T15:50:25.000Z",
+   "publisher": "AajTak"
+  },
+  {
+   "uuid": "4c0c1ac0-6721-4ce7-a835-3614b38cb455",
+   "title": "Silver Price Big Change: नहीं खरीद पाए सस्ती चांदी? MCX पर पलट गया गेम, लेकिन यहां अभी भी मौका",
+   "published_at": "2026-11-02T15:50:25.000Z",
+   "publisher": "AajTak"
+  },
+  {
+   "uuid": "29d49efd-a251-4a1d-ad76-dbdfe6e7dcb7",
+   "title": "Rates crash: Gold price slips 7%, silver tanks 20% in Oct: Is Dhanteras 2026 right time to buy? What should investors do",
+   "published_at": "2026-11-02T15:39:52.000Z",
+   "publisher": "TradingView"
+  },
+  {
+   "uuid": "542e359b-67a7-486e-8078-cb2e9ce35b02",
+   "title": "Silver Price Forecast: XAG/USD reclaims $50 as Oil tumbles, bearish trend holds",
+   "published_at": "2026-11-02T15:14:59.000Z",
+   "publisher": "FXStreet"
+  }
+ ],
+ "meta": {
+  "page_size": 10,
+  "returned": 10,
+  "has_more": true,
+  "order_by": "recent",
+  "filters": {
+   "published_after": null,
+   "published_before": null,
+   "language": null,
+   "country": null,
+   "topic": null,
+   "publisher_uuid": null,
+   "author_uuid": null,
+   "q": null,
+   "in_title": "silver price",
+   "in_body": null,
+   "in_subtitle": null
+  },
+  "offset": 0,
+  "next_offset": 10,
+  "next_cursor": "eyJ2IjoxLCJvcmRlcl9ieSI6InJlY2VudCIsInNpZyI6IjM4ODMzZTM1YmQ5N2U4ZjhlNTI4MzRhMjM4ZTg0OTE5MGU5NDQ4ZmM0NjYxMWNkYzk0MWVkODJmNjcyMDJhMjgiLCJsYXN0X3B1Ymxpc2hlZF9hdCI6IjIwMjYtMTEtMDJUMTU6MTQ6NTkuMDAwWiIsImxhc3RfaWQiOjM3MDYzNzk2fQ"
+ }
+}

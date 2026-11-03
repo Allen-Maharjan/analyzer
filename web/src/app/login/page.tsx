@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             autoComplete="current-password"
             required
             autoFocus
-            className="min-h-11 rounded-md border border-line bg-panel px-3 text-base"
+            className="min-h-11 rounded-xl border border-line bg-panel px-3 text-base"
           />
         </label>
         {message && (
@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             {message}
           </p>
         )}
-        <button type="submit" className="min-h-11 rounded-md bg-accent px-4 font-semibold text-white hover:bg-accent-hover">
+        <button type="submit" className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-white hover:bg-accent-hover">
           Sign in
         </button>
       </form>

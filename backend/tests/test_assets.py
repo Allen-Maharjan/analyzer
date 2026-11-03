@@ -74,7 +74,7 @@ def test_query_bounds_and_timeframe_capabilities():
 def test_ai_validates_small_currency_amounts():
     from gold_advisor.ai import contract
     inp = {'asset': SILVER.public(), 'facts': [{'id': 'price', 'value': 49.25, 'unit': 'USD/oz'}], 'levels': []}
-    out = {'plain_summary': 'Silver is $49.25.', 'outlook': 'neutral', 'adjustment': 0, 'adjustment_reason': 'Unchanged.', 'reasons': [{'text': 'Price is available.', 'evidence_ids': ['price']}] * 2, 'risks': [], 'watch_levels': []}
+    out = {'plain_summary': 'Silver is $49.25.', 'outlook': 'neutral', 'adjustment': 0, 'adjustment_reason': 'Unchanged.', 'reasons': [{'text': 'Price is available.', 'evidence_ids': ['price']}] * 2, 'risks': [], 'watch_levels': [], 'news_summary': '', 'news_citations': []}
     assert contract.validate(inp, out)['ok']
     assert not contract.validate(inp, {**out, 'plain_summary': 'Silver is $55.50.'})['ok']
     assert 'buy silver' in contract.prompt(inp)

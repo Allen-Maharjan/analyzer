@@ -78,6 +78,7 @@ def collect_gold_spot() -> None:
 @locked("nepal_today", ttl_seconds=600)
 def collect_nepal_today(force: bool = False) -> None:
     _quiet(lambda: jobs.collect_nepal_today(force=force))
+    process_news.delay()
     run_analysis.delay()
 
 
@@ -98,6 +99,18 @@ def collect_fx(force: bool = False) -> None:
 @locked("macro", ttl_seconds=1800)
 def collect_macro() -> None:
     _quiet(jobs.collect_macro)
+
+
+@app.task(name="news.process")
+@locked("news", ttl_seconds=600)
+def process_news() -> None:
+    from datetime import datetime
+
+    from gold_advisor import news_service
+    from gold_advisor.domain import UTC
+    from gold_advisor.persistence.db import session_scope
+
+    _quiet(lambda: news_service.process_pending(session_scope, get_settings().freenewsapi_key, lambda: datetime.now(UTC)))
 
 
 @app.task(name="collect.events")

@@ -136,11 +136,18 @@ def collect_nepal_today(force: bool = False) -> CollectionResult:
         return _skipped("today's Nepal rate already stored")
 
     def work() -> CollectionResult:
+        from gold_advisor import news_service
+
         with fenegosida.make_fenegosida_client() as client:
             rates, notes = fenegosida.fetch_today(client)
+        today = _nepal_today()
         with session_scope() as session:
+            before = news_service.today_prices(session, today)
             result = repository.save_local_rates(session, rates)
+            # Same transaction: a news job exists exactly when today's price was inserted or revised.
+            queued = news_service.enqueue_for_price_changes(session, before, news_service.today_prices(session, today), today, _now())
         result.notes.extend(notes)
+        result.notes.extend(f"news refresh queued for {asset_id}" for asset_id in queued)
         return result
 
     return run_job("fenegosida.today", Source.FENEGOSIDA, work)

@@ -1,16 +1,21 @@
-# Every 30 minutes: collect prices, run the analysis, run the AI only when something
+# Every 30 minutes (except Saturday in Nepal): collect prices, run the analysis, run the AI only when something
 # significant changed, and save everything to Neon.
 #
 # Repository secrets (Settings > Secrets and variables > Actions):
 #   NEON_DATABASE_URL      Neon connection string (direct, not pooled)
 #   GA_OPENROUTER_API_KEY  OpenRouter key; free models only. Optional: without it the AI step is skipped.
+#   FREENEWSAPI_KEY        FreeNewsAPI key. Optional: without it news refreshes are recorded as unavailable.
 name: collect
 
 on:
   schedule:
-    # Every 30 minutes on Nepal time's :00 and :30 (11:00, 11:30, ... NPT).
-    # Nepal is UTC+5:45, so NPT :00/:30 is UTC :15/:45. GitHub cron runs in UTC.
-    - cron: "15,45 * * * *"
+    # Every 30 minutes on Nepal time's :00 and :30 (11:00, 11:30, ... NPT), except Saturday
+    # in Nepal: no Nepal price is published and world gold is closed, so there is nothing new.
+    # Nepal is UTC+5:45, so NPT :00/:30 is UTC :15/:45. GitHub cron runs in UTC, and
+    # Nepal's Saturday is Friday 18:15 UTC to Saturday 18:15 UTC, hence three lines:
+    - cron: "15,45 * * * 0-4"   # Sunday-Thursday UTC, all day
+    - cron: "15,45 0-17 * * 5"  # Friday UTC until 18:15 (= Saturday 00:00 NPT)
+    - cron: "15,45 18-23 * * 6" # Saturday UTC from 18:15 (= Sunday 00:00 NPT)
   workflow_dispatch:
     inputs:
       force_daily:
@@ -33,39 +38,58 @@ jobs:
     env:
       GA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       GA_OPENROUTER_API_KEY: ${{ secrets.GA_OPENROUTER_API_KEY }}
+      FREENEWSAPI_KEY: ${{ secrets.FREENEWSAPI_KEY }}
       PYTHONPATH: ${{ github.workspace }}/runner
       PYTHONUNBUFFERED: "1"
       GA_FORCE_DAILY: ${{ inputs.force_daily }}
     steps:
+      # GitHub can start scheduled runs late, so a Friday-evening run may land on Nepal's
+      # Saturday. Skip it then. Manual runs (Refresh, Ask AI) always go ahead.
+      - name: Skip Saturday (Nepal time)
+        id: day
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(TZ=Asia/Kathmandu date +%u)" = "6" ]; then
+            echo "Saturday in Nepal: nothing new to collect; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v5
+        if: steps.day.outputs.skip != 'true'
 
       - uses: actions/setup-python@v6
+        if: steps.day.outputs.skip != 'true'
         with:
           python-version: "3.12"
 
       - uses: astral-sh/setup-uv@v7
+        if: steps.day.outputs.skip != 'true'
         with:
           enable-cache: true
           cache-dependency-glob: backend/pyproject.toml
 
       - uses: actions/setup-node@v5
+        if: steps.day.outputs.skip != 'true'
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: backend/dukascopy/package-lock.json
 
       - name: Install
+        if: steps.day.outputs.skip != 'true'
         run: |
           uv pip install --system -e backend
           npm ci --prefix backend/dukascopy --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: Check secrets
+        if: steps.day.outputs.skip != 'true'
         run: |
           if [ -z "$GA_DATABASE_URL" ]; then echo "::error::Add the NEON_DATABASE_URL repository secret."; exit 1; fi
 
       - name: Database migrations
+        if: steps.day.outputs.skip != 'true'
         working-directory: backend
         run: alembic upgrade head
 
       - name: Collect, analyse, AI
+        if: steps.day.outputs.skip != 'true'
         run: python -m gold_advisor.cycle

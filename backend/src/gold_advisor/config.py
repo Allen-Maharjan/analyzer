@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     github_workflow: str = "collect.yml"
     github_ref: str = "main"
 
+    # FreeNewsAPI key. Read from FREENEWSAPI_KEY (no GA_ prefix); sent only in x-api-key.
+    freenewsapi_key: str = Field(default="", validation_alias="FREENEWSAPI_KEY")
+
 
 @lru_cache
 def get_settings() -> Settings:

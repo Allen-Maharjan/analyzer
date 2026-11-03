@@ -59,6 +59,25 @@ def expire_stale(session: Session, now: datetime) -> None:
 
 
 
+NEWS_MAX_AGE = timedelta(hours=48)
+
+
+def news_for_ai(session: Session, asset: AssetDefinition, now: datetime) -> list[dict]:
+    from gold_advisor import news_service
+
+    return [
+        {
+            "id": f"news-{a.provider_id}",
+            "title": a.title,
+            "publisher": a.publisher,
+            "published_at": a.published_at.isoformat(),
+            "excerpt": a.excerpt,
+        }
+        for a in news_service.recent_articles(session, asset, limit=5)
+        if now - a.published_at <= NEWS_MAX_AGE
+    ]
+
+
 def enqueue(session: Session, trigger: str, now: datetime | None = None, asset: AssetDefinition = GOLD) -> AiAnalysisRow | None:
     now = now or datetime.now(UTC)
     expire_stale(session, now)
@@ -77,7 +96,9 @@ def enqueue(session: Session, trigger: str, now: datetime | None = None, asset: 
         model=cfg.get("model") or None,
         prompt_version=contract.PROMPT_VERSION,
         created_at=now,
-        input=contract.build_input(snap.id, {**market_data.normalized_payload(snap), "asset": asset.public()}),
+        input=contract.build_input(
+            snap.id, {**market_data.normalized_payload(snap), "asset": asset.public()}, news_for_ai(session, asset, now)
+        ),
     )
     session.add(row)
     session.flush()

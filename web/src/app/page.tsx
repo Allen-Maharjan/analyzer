@@ -7,6 +7,8 @@ import { NepalPriceChart } from "@/components/NepalPriceChart";
 import { PlanActions } from "@/components/PlanActions";
 import { ScenarioBar } from "@/components/ScenarioBar";
 import { AskAiButton } from "@/components/AskAiButton";
+import { NewsSection } from "@/components/NewsSection";
+import type { NewsOverview } from "@/lib/news";
 import { PROVIDER_NAMES, type AiOverview } from "@/lib/ai";
 import { BackendError, backend, backendOrNull, type Dashboard } from "@/lib/backend";
 import { withAsset } from "@/lib/asset";
@@ -29,11 +31,13 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   let dashboard: Dashboard | null;
   let plan: Plan;
   let ai: AiOverview | null;
+  let news: NewsOverview | null;
   try {
-    [dashboard, plan, ai] = await Promise.all([
+    [dashboard, plan, ai, news] = await Promise.all([
       backendOrNull<Dashboard>(withAsset("/api/v1/dashboard", asset)),
       backend<Plan>(withAsset("/api/v1/plan", asset)),
       backend<AiOverview>(withAsset("/api/v1/ai", asset)).catch(() => null),
+      backend<NewsOverview>(withAsset("/api/v1/news", asset)).catch(() => null),
     ]);
   } catch (error) {
     return (
@@ -78,6 +82,25 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <p className="mt-4 text-sm text-ink-2">
           {CONFIDENCE_WORDS[d.confidence] ?? d.confidence} · Check again {d.next_review.charAt(0).toLowerCase() + d.next_review.slice(1)}
         </p>
+        {d.news_risk && (
+          <p className="mt-3 border-t border-wait/15 pt-3 text-sm text-ink">
+            The numbers alone say <span className="font-semibold">{d.news_risk.original_decision === "BUY" ? "Buy" : d.news_risk.original_decision}</span>.
+            It shows Wait because you flagged a news story
+            {d.news_risk.article_title ? (
+              <>
+                :{" "}
+                {d.news_risk.article_url ? (
+                  <a href={d.news_risk.article_url} target="_blank" rel="noopener noreferrer nofollow" className="underline underline-offset-4">
+                    {d.news_risk.article_title}
+                  </a>
+                ) : (
+                  d.news_risk.article_title
+                )}
+              </>
+            ) : null}
+            . Your reason: “{d.news_risk.reason}”
+          </p>
+        )}
       </section>
 
       {d.waiting.review_due && (
@@ -99,13 +122,45 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                 ? nepalTime(d.prices.nepal_published_at)
                 : nepalDate(d.prices.nepal_date)}
               {change != null && change !== 0 && (
-                <span className={`num font-medium ${change > 0 ? "text-wait" : "text-buy"}`}> · {change > 0 ? "up" : "down"} {rupees(Math.abs(change))} since last update</span>
+                <>
+                  {" · "}
+                  <span className={`num whitespace-nowrap font-medium ${change > 0 ? "text-wait" : "text-buy"}`}>
+                    {change > 0 ? "up" : "down"} {rupees(Math.abs(change))} since last update
+                  </span>
+                </>
               )}
             </p>
             <div className="mt-5">
               <NepalPriceChart points={history} />
             </div>
           </>
+        )}
+      </Section>
+
+      <Section title="Why">
+        <ul className="space-y-3 text-[17px] leading-relaxed">
+          {d.reasons.map((reason) => (
+            <li key={reason.plain} className="flex gap-3">
+              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
+              <span>{reason.plain}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
+          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors hover:bg-accent-hover"
+        >
+          View detailed analysis
+          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
+        </Link>
+      </Section>
+
+      <Section title="What would change this">
+        <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
+        {d.next_event && (
+          <p className="mt-3 text-[15px] text-ink-2">
+            Next big US announcement: {d.next_event.title.replace(/\s*\(.*\)$/, "")}, {nepalTime(d.next_event.scheduled_at)}.
+          </p>
         )}
       </Section>
 
@@ -165,32 +220,11 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </Section>
       )}
 
-      <Section title="Why">
-        <ul className="space-y-3 text-[17px] leading-relaxed">
-          {d.reasons.map((reason) => (
-            <li key={reason.plain} className="flex gap-3">
-              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
-              <span>{reason.plain}</span>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
-          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors hover:bg-accent-hover"
-        >
-          View detailed analysis
-          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
-        </Link>
-      </Section>
-
-      <Section title="What would change this">
-        <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
-        {d.next_event && (
-          <p className="mt-3 text-[15px] text-ink-2">
-            Next big US announcement: {d.next_event.title.replace(/\s*\(.*\)$/, "")}, {nepalTime(d.next_event.scheduled_at)}.
-          </p>
-        )}
-      </Section>
+      {news && (
+        <Section title={`${d.asset.label} in the news`}>
+          <NewsSection key={asset} news={news} asset={asset} label={label} />
+        </Section>
+      )}
 
       <Section title="Your purchase">
         <p className="mb-3 text-[15px] text-ink-2">

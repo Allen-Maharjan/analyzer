@@ -6,20 +6,24 @@ The app runs in two modes over the **same Python code and the same Neon database
 
 | Mode | Scheduler | Where code runs | AI | Status |
 |---|---|---|---|---|
-| **Cloud** (target) | GitHub Actions every 30 min | GitHub-hosted runner | OpenRouter free models | Workflow written and tested locally; first GitHub run pending |
+| **Cloud** (live since 2026-11-03) | GitHub Actions every 30 min | GitHub-hosted runner; API and dashboard on Vercel | OpenRouter free models | Working |
 | **Local** (original) | Celery beat | Docker Compose on the owner's computer | Codex / Claude Code / Kiro / OpenRouter via the host runner | Working; now writes to Neon |
 
-Both modes are idempotent, so running them at the same time is safe but wasteful. Once the cloud workflow is confirmed, stop the local scheduler with `docker compose stop worker beat`.
+Both modes are idempotent, so running them at the same time is safe but wasteful. With the cloud mode live, stop the local scheduler with `docker compose stop worker beat`.
 
 ## Cloud mode
 
 ```
 GitHub Actions (cron :15 and :45 UTC = :00 and :30 NPT, e.g. 11:00 and 11:30; or "Run workflow")
+  No scheduled runs on Saturday, Nepal time (no Nepal publication, world market closed);
+  a late run that lands on Nepal's Saturday skips itself. Manual runs always go ahead.
   └─ .github/workflows/collect.yml
        ├─ install: uv pip install -e backend, npm ci in backend/dukascopy
        ├─ alembic upgrade head            (against Neon)
        └─ python -m gold_advisor.cycle    (backend/src/gold_advisor/cycle.py)
-            1. collect   world spot + 15m/1h/1D candles per asset, Nepal today, NRB USD/NPR
+            1. collect   world spot + 15m/1h/1D candles per asset, only while the world market is
+                         open or closed < 1 h ago (no chart updates over the weekend), then
+                         Nepal today, NRB USD/NPR
                          FRED and FOMC every 6 h, Nepal history daily (gated by last success)
             2. analyse   one immutable snapshot per asset (gold, silver)
             3. AI        only if significant: advice changed, new Nepal publication,

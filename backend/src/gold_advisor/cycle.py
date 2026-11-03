@@ -53,8 +53,23 @@ def _due(job: str, every: timedelta, now: datetime) -> bool:
     return last is None or now - last >= every
 
 
+# After the world market closes, keep collecting this long so the closing price and the
+# final candles are stored. Runs are 30 minutes apart, so this covers two runs.
+MARKET_CLOSE_GRACE = timedelta(hours=1)
+
+
+def world_market_active(asset: AssetDefinition, now: datetime) -> bool:
+    """True while the world market is open, or just closed. While it is closed (the weekend,
+    from Friday evening to Sunday evening New York time, and the daily one-hour break) the
+    price does not move, so the chart is not updated."""
+    return asset.calendar.is_open(now) or now - asset.calendar.last_open(now) < MARKET_CLOSE_GRACE
+
+
 def collect(now: datetime) -> None:
     for asset in ASSETS.values():
+        if not world_market_active(asset, now):
+            log.info("SKIPPED world prices %s: market closed", asset.id)
+            continue
         _step(f"spot {asset.id}", lambda a=asset: jobs.collect_gold_spot(a))
         for tf in CANDLE_TIMEFRAMES:
             _step(f"candles {tf.value} {asset.id}", lambda a=asset, t=tf: jobs.collect_candles(t, a))
@@ -151,10 +166,23 @@ def ai_if_significant(asset: AssetDefinition, now: datetime) -> None:
         log.info("AI %s: %s %s", asset.id, done.status if done else "lost", (done.error or "") if done else "")
 
 
+def news() -> None:
+    """Run queued news refreshes (queued when today's Nepal price changes, or from the dashboard)."""
+    from gold_advisor import news_service
+    from gold_advisor.config import get_settings
+
+    try:
+        for line in news_service.process_pending(session_scope, get_settings().freenewsapi_key, lambda: datetime.now(UTC)):
+            log.info(line)
+    except Exception as exc:  # noqa: BLE001 - news is optional; never fail the cycle for it
+        log.error("news failed: %s", exc)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     now = datetime.now(UTC)
     collect(now)
+    news()  # before analysis and AI, so the AI sees fresh headlines
     analysed = [_step(f"analysis {a.id}", lambda a=a: jobs.run_analysis(a)) for a in ASSETS.values()]
     from gold_advisor.ai import service
 

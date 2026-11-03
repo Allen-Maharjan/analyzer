@@ -490,6 +490,18 @@ class DashboardOut(BaseModel):
     next_event: NextEventOut | None
     sources: list[SourceStatusOut]
     forecasts: list[ForecastSummaryOut]
+    news_risk: "NewsRiskOverrideOut | None" = None
+
+
+class NewsRiskOverrideOut(BaseModel):
+    """Present only when an owner-confirmed news risk changed BUY into WAIT."""
+
+    original_decision: str
+    reason: str
+    expires_at: datetime
+    article_title: str | None
+    article_publisher: str | None
+    article_url: str | None
 
 
 def _latest_snapshot(session: Session, asset: AssetDefinition) -> AnalysisSnapshotRow:
@@ -501,9 +513,24 @@ def _latest_snapshot(session: Session, asset: AssetDefinition) -> AnalysisSnapsh
 
 @app.get("/api/v1/dashboard", response_model=DashboardOut)
 def dashboard(session: SessionDep, asset: AssetDep) -> DashboardOut:
+    from gold_advisor import news_service
+    from gold_advisor.decision import news_risk
+
     row = _latest_snapshot(session, asset)
     p = market_data.normalized_payload(row)
-    d = p["decision"]
+    now = datetime.now(UTC)
+    active = news_service.active_risk(session, asset, now)
+    risk = (
+        news_risk.Risk(
+            active.reason, active.expires_at,
+            active.article.title if active.article else None,
+            active.article.publisher if active.article else None,
+            active.article.url if active.article else None,
+        )
+        if active
+        else None
+    )
+    d, override = news_risk.apply(p["decision"], risk, now)
     nepal_latest = p["prices"]["nepal_latest"] or {}
     return DashboardOut(
         asset=AssetOut(**asset.public()),
@@ -548,6 +575,7 @@ def dashboard(session: SessionDep, asset: AssetDep) -> DashboardOut:
             SourceStatusOut(dataset=s["dataset"], status=s["freshness"]["status"], latest=s["latest_observation"])
             for s in p["sources"]
         ],
+        news_risk=NewsRiskOverrideOut(**override) if override else None,
     )
 
 
@@ -705,3 +733,131 @@ def runner_result(session: SessionDep, job_id: int, body: RunnerResultIn, author
     if row is None:
         raise HTTPException(status_code=409, detail="job is not running")
     return {"status": row.status, "error": row.error}
+
+
+# --- News --------------------------------------------------------------------------------
+
+
+class NewsArticleOut(BaseModel):
+    id: str
+    title: str
+    publisher: str
+    published_at: datetime
+    url: str
+    excerpt: str
+    can_flag: bool  # published within 24 hours, so it can be marked as a reason to wait
+
+
+class NewsStatusOut(BaseModel):
+    state: str  # fresh | stale | empty | unavailable | pending
+    refreshed_at: datetime | None
+    refreshing: bool
+    last_attempt_failed: bool
+
+
+class NewsAiOut(BaseModel):
+    summary: str
+    cited: list[str]
+    finished_at: datetime
+
+
+class NewsRiskOut(BaseModel):
+    article_id: str
+    reason: str
+    confirmed_at: datetime
+    expires_at: datetime
+
+
+class NewsOut(BaseModel):
+    status: NewsStatusOut
+    articles: list[NewsArticleOut]
+    ai: NewsAiOut | None
+    risk: NewsRiskOut | None
+
+
+@app.get("/api/v1/news", response_model=NewsOut)
+def news(session: SessionDep, asset: AssetDep) -> NewsOut:
+    from gold_advisor import news_service
+    from gold_advisor.persistence.models import AiAnalysisRow
+
+    now = datetime.now(UTC)
+    articles = news_service.recent_articles(session, asset)
+    ids = {f"news-{a.provider_id}" for a in articles}
+    latest_ai = session.execute(
+        select(AiAnalysisRow.output, AiAnalysisRow.finished_at)
+        .where(AiAnalysisRow.asset_id == asset.id, AiAnalysisRow.status == "succeeded")
+        .order_by(AiAnalysisRow.finished_at.desc())
+        .limit(1)
+    ).first()
+    ai = None
+    if latest_ai and isinstance(latest_ai.output, dict) and (latest_ai.output.get("news_summary") or "").strip():
+        cited = [c for c in latest_ai.output.get("news_citations") or [] if c in ids]
+        if cited:  # only show an AI news summary whose sources are still listed
+            ai = NewsAiOut(summary=latest_ai.output["news_summary"], cited=cited, finished_at=latest_ai.finished_at)
+    active = news_service.active_risk(session, asset, now)
+    st = news_service.status(session, asset, now)
+    return NewsOut(
+        status=NewsStatusOut(**{k: st[k] for k in ("state", "refreshed_at", "refreshing", "last_attempt_failed")}),
+        articles=[
+            NewsArticleOut(
+                id=f"news-{a.provider_id}", title=a.title, publisher=a.publisher, published_at=a.published_at,
+                url=a.url, excerpt=a.excerpt, can_flag=now - a.published_at < news_service.RISK_WINDOW,
+            )
+            for a in articles
+        ],
+        ai=ai,
+        risk=(
+            NewsRiskOut(
+                article_id=f"news-{active.article.provider_id}" if active.article else "",
+                reason=active.reason, confirmed_at=active.confirmed_at, expires_at=active.expires_at,
+            )
+            if active
+            else None
+        ),
+    )
+
+
+NEWS_REFRESH_COOLDOWN_SECONDS = 60
+
+
+@app.post("/api/v1/news/refresh", status_code=status.HTTP_202_ACCEPTED)
+def news_refresh(session: SessionDep, asset: AssetDep, response: Response) -> dict:
+    from gold_advisor import news_service
+
+    if not cooldown_passed(session, f"news_refresh:{asset.id}", NEWS_REFRESH_COOLDOWN_SECONDS):
+        response.status_code = status.HTTP_429_TOO_MANY_REQUESTS
+        response.headers["Retry-After"] = str(NEWS_REFRESH_COOLDOWN_SECONDS)
+        return {"queued": False, "message": "News was refreshed less than a minute ago."}
+    now = datetime.now(UTC)
+    news_service.enqueue(session, asset, "manual", f"manual:{now:%Y%m%d%H%M}", now)
+    session.commit()  # the GitHub run or Celery worker must see the job
+    if dispatch_cycle():
+        return {"queued": True, "message": "Looking for news. New articles appear in about 2–3 minutes."}
+    from gold_advisor import tasks
+
+    tasks.process_news.delay()
+    return {"queued": True, "message": "Looking for news. New articles appear within a minute."}
+
+
+class NewsRiskIn(BaseModel):
+    article_id: Annotated[str, Field(pattern=r"^news-[0-9A-Za-z-]{8,64}$")]
+    reason: Annotated[str, Field(min_length=1, max_length=300)]
+
+
+@app.post("/api/v1/news/risk", response_model=NewsRiskOut)
+def news_risk_confirm(session: SessionDep, asset: AssetDep, body: NewsRiskIn) -> NewsRiskOut:
+    from gold_advisor import news_service
+
+    now = datetime.now(UTC)
+    try:
+        row = news_service.confirm_risk(session, asset, body.article_id.removeprefix("news-"), body.reason, now)
+    except news_service.RiskRejected as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return NewsRiskOut(article_id=body.article_id, reason=row.reason, confirmed_at=row.confirmed_at, expires_at=row.expires_at)
+
+
+@app.post("/api/v1/news/risk/clear")
+def news_risk_clear(session: SessionDep, asset: AssetDep) -> dict:
+    from gold_advisor import news_service
+
+    return {"cleared": news_service.clear_risk(session, asset, datetime.now(UTC))}
