@@ -14,9 +14,11 @@ import pandas as pd
 
 from gold_advisor.domain import NEPAL_TZ, TROY_OUNCES_PER_TOLA, UTC
 
-VERSION = "nepal-1"
+VERSION = "nepal-2"
 PREMIUM_WINDOW = 20
 PREMIUM_MIN_OBSERVATIONS = 10
+# "Recent high" for the drop-from-high check: the highest of the last 20 publications (about 3–4 weeks).
+RECENT_HIGH_WINDOW = 20
 # Used when a publication has a date but no time. Typical publication is 10:00–11:00 NPT.
 ASSUMED_PUBLICATION_TIME = time(10, 45)
 LAG_MIN_GAP = 0.01
@@ -57,6 +59,8 @@ class NepalLag:
     nepal_change_3_publications: float | None  # rupees, latest minus two publications earlier
     nepal_change_3_publications_pct: float | None
     publication_dates_only: bool
+    recent_high: float | None = None  # highest of the last RECENT_HIGH_WINDOW publications
+    drawdown_from_high_pct: float | None = None  # latest vs that high, e.g. -0.06
 
 
 def publication_instant(p: Publication) -> tuple[datetime, bool]:
@@ -113,6 +117,10 @@ def analyse(
     if len(prices) >= 3:
         change = prices[-1] - prices[-3]
         pct = change / prices[-3]
+    high = drawdown = None
+    if len(prices) >= RECENT_HIGH_WINDOW:
+        high = max(prices[-RECENT_HIGH_WINDOW:])
+        drawdown = prices[-1] / high - 1
 
     return NepalLag(
         latest=latest,
@@ -127,6 +135,8 @@ def analyse(
         nepal_change_3_publications=change,
         nepal_change_3_publications_pct=pct,
         publication_dates_only=bool(latest and not latest.time_known),
+        recent_high=high,
+        drawdown_from_high_pct=drawdown,
     )
 
 

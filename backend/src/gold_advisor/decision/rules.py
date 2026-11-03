@@ -3,10 +3,12 @@
 Rules apply in strict precedence (first match wins):
 1. WATCH CLOSELY when essential data is stale, missing, inconsistent, or insufficient.
 2. WAIT when a major event is within 24 h, world gold fell more than 2% since Nepal's last
-   publication, or a confirmed breakdown still has strong downside momentum.
-3. BUY when Nepal fell at least Rs 3,000/tola or 1% across the latest three publications,
-   the expected Nepal adjustment has cleared, and two completed 4-hour candles show no new
-   selloff low with improving RSI or MACD.
+   publication, or a confirmed breakdown still has strong downside momentum and the 4-hour
+   chart has not paused (a breakdown whose fall has paused no longer forces WAIT).
+3. BUY when Nepal has come down (at least Rs 3,000/tola or 1% across the latest three
+   publications, or, where the asset enables it, at least 5% below its highest of the last 20
+   publications), the expected Nepal adjustment has cleared, and two completed 4-hour candles
+   show no new selloff low with improving RSI or MACD.
 4. WATCH CLOSELY otherwise.
 
 Every result carries plain text for a non-trader and separate technical detail.
@@ -18,7 +20,7 @@ from gold_advisor.assets import AssetDefinition, GOLD
 from gold_advisor.decision.nepal import NepalLag
 from gold_advisor.domain import Confidence, Decision, Outlook
 
-VERSION = "rules-1"
+VERSION = "rules-2"
 WAIT_EVENT_HOURS = 24
 WAIT_INTL_DECLINE = -0.02
 BUY_DROP_RUPEES = -3000
@@ -119,6 +121,23 @@ def _nepal_reason(lag: NepalLag, asset: AssetDefinition) -> Reason | None:
     else:
         plain = f"Nepal's {asset.label.lower()} price is unchanged over the last three price updates."
     return Reason(plain, f"Latest {lag.latest.rate_date}: {rupees(lag.latest.nepal_price)}; change {pct(lag.nepal_change_3_publications_pct or 0)}.")
+
+
+def _dropped(lag: NepalLag, asset: AssetDefinition) -> tuple[bool, Reason | None]:
+    """Has Nepal's price come down enough to consider buying? Returns the answer and, when the
+    longer slide is what counts, a reason saying so."""
+    if lag.nepal_change_3_publications is not None and (
+        (asset.buy_drop_rupees is not None and lag.nepal_change_3_publications <= asset.buy_drop_rupees)
+        or (lag.nepal_change_3_publications_pct or 0) <= asset.buy_drop_pct
+    ):
+        return True, None
+    if asset.buy_drawdown_pct is not None and lag.drawdown_from_high_pct is not None and lag.drawdown_from_high_pct <= asset.buy_drawdown_pct:
+        return True, Reason(
+            f"Nepal's {asset.label.lower()} price is {abs(lag.drawdown_from_high_pct) * 100:.0f}% below its high of the last few weeks "
+            f"({rupees(lag.recent_high or 0)} per tola).",
+            f"Latest vs highest of the last 20 publications: {pct(lag.drawdown_from_high_pct)}; threshold {pct(asset.buy_drawdown_pct)}.",
+        )
+    return False, None
 
 
 def _lag_reason(lag: NepalLag) -> Reason | None:
@@ -230,7 +249,7 @@ def decide(inp: DecisionInputs) -> DecisionResult:
             "After Nepal's next price update (usually around 11 am).",
             "Nepal publishing a lower price, or world prices recovering.",
         )
-    if inp.strong_breakdown:
+    if inp.strong_breakdown and not inp.h4_stabilized:
         reasons.append(
             Reason(f"World {inp.asset.label.lower()} just broke below an important price floor and is still falling hard.", inp.strong_breakdown)
         )
@@ -243,11 +262,15 @@ def decide(inp: DecisionInputs) -> DecisionResult:
             "The fall slowing down and prices holding steady.",
         )
 
+    if inp.strong_breakdown:
+        # A recent breakdown whose fall has paused: not a reason to wait on its own, but still a risk.
+        downside.append(f"World {inp.asset.label.lower()} recently broke below an important price floor; the fall has paused but could resume.")
+
     # 3. Conditions to buy.
-    dropped = lag.nepal_change_3_publications is not None and (
-        (inp.asset.buy_drop_rupees is not None and lag.nepal_change_3_publications <= inp.asset.buy_drop_rupees) or (lag.nepal_change_3_publications_pct or 0) <= inp.asset.buy_drop_pct
-    )
+    dropped, slide_reason = _dropped(lag, inp.asset)
     if dropped and lag.adjustment_pending is False and inp.h4_stabilized:
+        if slide_reason is not None:
+            reasons.append(slide_reason)
         reasons.append(Reason("World prices have stopped falling for now.", inp.h4_detail))
         return result(
             Decision.BUY,

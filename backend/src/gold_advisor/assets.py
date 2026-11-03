@@ -37,6 +37,10 @@ class AssetDefinition:
     watch_levels: tuple[float, ...] = ()
     buy_drop_rupees: float | None = None
     buy_drop_pct: float = -0.01
+    # BUY also counts a slide that built up over a few weeks: the latest Nepal price at least this far
+    # below its highest of the last 20 publications. None turns the check off. Tuned on a two-year
+    # replay (Dec 2024 to Nov 2026): it improved gold's BUY timing; for silver it made it worse, so it is off.
+    buy_drawdown_pct: float | None = None
     wait_decline_pct: float = -0.02
     # News search (FreeNewsAPI in_title phrases) and the words a headline must contain.
     news_terms: tuple[str, ...] = ()
@@ -67,7 +71,7 @@ ASSETS = {
     a.id: a for a in (
         AssetDefinition('gold', 'Gold', 'XAU/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAU', candle_symbol='xauusd',
-                        metal=Metal.GOLD, purity=Purity.HALLMARK, local_label='Hallmark gold', watch_levels=(4000.0,), buy_drop_rupees=-3000,
+                        metal=Metal.GOLD, purity=Purity.HALLMARK, local_label='Hallmark gold', watch_levels=(4000.0,), buy_drop_rupees=-3000, buy_drawdown_pct=-0.05,
                         news_terms=('gold price', 'gold bullion', 'XAU USD'), news_keywords=('gold', 'xau', 'bullion', 'precious metal')),
         AssetDefinition('silver', 'Silver', 'XAG/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAG', candle_symbol='xagusd',
