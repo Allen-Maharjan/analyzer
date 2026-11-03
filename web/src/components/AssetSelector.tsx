@@ -7,6 +7,10 @@ export function AssetSelector({ asset }: { asset: string }) {
   const pathname = usePathname();
   const [assets, setAssets] = useState<Asset[]>([]);
   useEffect(() => { fetch("/api/assets").then(r => r.ok ? r.json() : []).then(setAssets).catch(() => {}); }, []);
+  // Warm up the other assets' pages so a switch shows content sooner.
+  useEffect(() => {
+    for (const a of assets) if (a.id !== asset) router.prefetch(`${pathname}?asset=${encodeURIComponent(a.id)}`);
+  }, [assets, asset, pathname, router]);
   return <label className="flex items-center gap-2 text-sm">Asset
     <select aria-label="Asset" value={asset} className="min-h-11 rounded-md border border-line bg-panel px-2"
       onChange={event => router.push(`${pathname}?asset=${encodeURIComponent(event.target.value)}`)}>

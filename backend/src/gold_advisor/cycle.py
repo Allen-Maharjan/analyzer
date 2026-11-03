@@ -156,6 +156,10 @@ def main() -> int:
     now = datetime.now(UTC)
     collect(now)
     analysed = [_step(f"analysis {a.id}", lambda a=a: jobs.run_analysis(a)) for a in ASSETS.values()]
+    from gold_advisor.ai import service
+
+    with session_scope() as session:
+        service.expire_stale(session, datetime.now(UTC))
     for asset in ASSETS.values():
         try:
             ai_if_significant(asset, datetime.now(UTC))

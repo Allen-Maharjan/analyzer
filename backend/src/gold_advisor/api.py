@@ -622,7 +622,7 @@ class AiSettingsIn(BaseModel):
 
 @app.get("/api/v1/ai")
 def ai_overview(session: SessionDep, asset: AssetDep) -> dict:
-    ai_service.expire_stale(session, datetime.now(UTC))
+    # Read-only: stale jobs are expired by the scheduled cycle, not on every page load.
     return {**ai_service.latest(session, asset), "settings": ai_service.get_settings(session), "runner": ai_service.runner_status(session)}
 
 
