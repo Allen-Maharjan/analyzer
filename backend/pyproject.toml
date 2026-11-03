@@ -1,0 +1,38 @@
+[project]
+name = "gold-advisor"
+version = "0.1.0"
+description = "Nepal Gold Purchase Advisor: data collection and API"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+  "pydantic>=2.8,<3",
+  "pydantic-settings>=2.4,<3",
+  "sqlalchemy>=2.0.32,<2.1",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.13,<2",
+  "celery[redis]>=5.4,<6",
+  "redis>=5.0,<6",
+  "httpx>=0.27,<1",
+  "certifi>=2024.7.4",
+  "numpy>=1.26,<3",
+  "pandas>=2.2,<3",
+  "TA-Lib>=0.6,<0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "respx>=0.21,<1"]
+
+[project.scripts]
+gold-advisor = "gold_advisor.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gold_advisor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: needs a running PostgreSQL/TimescaleDB (GA_TEST_DATABASE_URL)"]

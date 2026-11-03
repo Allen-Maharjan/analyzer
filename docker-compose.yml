@@ -1,0 +1,99 @@
+name: gold-advisor
+
+x-backend: &backend
+  build: ./backend
+  image: gold-advisor-backend:local
+  restart: unless-stopped
+  environment:
+    # Neon when NEON_DATABASE_URL is set in .env; otherwise the local db container.
+    GA_DATABASE_URL: ${NEON_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-gold}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-gold}}
+    GA_REDIS_URL: redis://redis:6379/0
+    GA_RUNNER_TOKEN: ${GA_RUNNER_TOKEN:-}
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  db:
+    image: timescale/timescaledb:2.17.2-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gold}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-gold}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${API_PORT:-8010}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["celery", "-A", "gold_advisor.tasks", "worker", "--loglevel=INFO", "--concurrency=2"]
+
+  beat:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # Exactly one scheduler. Schedule state lives in /tmp so the image stays read-only.
+    command: ["celery", "-A", "gold_advisor.tasks", "beat", "--loglevel=INFO", "--schedule=/tmp/celerybeat-schedule"]
+
+  web:
+    build: ./web
+    image: gold-advisor-web:local
+    restart: unless-stopped
+    environment:
+      GA_API_URL: http://api:8000
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?set OWNER_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    depends_on:
+      api:
+        condition: service_healthy
+    # 127.0.0.1 keeps it on this computer. Set WEB_BIND=0.0.0.0 to open it to your home Wi-Fi.
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-3010}:3000"
+
+volumes:
+  db-data:
+  redis-data:

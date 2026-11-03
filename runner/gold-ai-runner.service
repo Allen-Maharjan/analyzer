@@ -1,0 +1,18 @@
+# User service. Install:
+#   mkdir -p ~/.config/systemd/user && cp runner/gold-ai-runner.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now gold-ai-runner
+[Unit]
+Description=Nepal Gold Advisor AI runner (Codex / Claude Code / Kiro CLI)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/Documents/trade_analysis
+ExecStart=/usr/bin/env python3 %h/Documents/trade_analysis/runner/gold_ai_runner.py --env-file %h/Documents/trade_analysis/.env
+# The CLIs live under nvm and ~/.local/bin; add them to PATH.
+Environment=PATH=%h/.local/bin:%h/.nvm/versions/node/v24.14.0/bin:/usr/local/bin:/usr/bin:/bin
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

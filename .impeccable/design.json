@@ -1,0 +1,445 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T07:17:32.361Z",
+  "title": "Design System: Gold Advisor",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "canonical": "#f6f4ef",
+        "oklch": "oklch(96.7% 0.007 88.6)",
+        "tonalRamp": [
+          "oklch(15% 0.007 88.6)",
+          "oklch(25% 0.007 88.6)",
+          "oklch(35% 0.007 88.6)",
+          "oklch(45% 0.007 88.6)",
+          "oklch(55% 0.007 88.6)",
+          "oklch(65% 0.007 88.6)",
+          "oklch(80% 0.007 88.6)",
+          "oklch(95% 0.007 88.6)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "White Panel",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 0)",
+        "tonalRamp": [
+          "oklch(15% 0.004 89.9)",
+          "oklch(25% 0.004 89.9)",
+          "oklch(35% 0.004 89.9)",
+          "oklch(45% 0.004 89.9)",
+          "oklch(55% 0.004 89.9)",
+          "oklch(65% 0.004 89.9)",
+          "oklch(80% 0.004 89.9)",
+          "oklch(95% 0.004 89.9)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e4dfd4",
+        "oklch": "oklch(90.5% 0.016 86.4)",
+        "tonalRamp": [
+          "oklch(15% 0.016 86.4)",
+          "oklch(25% 0.016 86.4)",
+          "oklch(35% 0.016 86.4)",
+          "oklch(45% 0.016 86.4)",
+          "oklch(55% 0.016 86.4)",
+          "oklch(65% 0.016 86.4)",
+          "oklch(80% 0.016 86.4)",
+          "oklch(95% 0.016 86.4)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1d1b17",
+        "oklch": "oklch(22.3% 0.008 84.6)",
+        "tonalRamp": [
+          "oklch(15% 0.008 84.6)",
+          "oklch(25% 0.008 84.6)",
+          "oklch(35% 0.008 84.6)",
+          "oklch(45% 0.008 84.6)",
+          "oklch(55% 0.008 84.6)",
+          "oklch(65% 0.008 84.6)",
+          "oklch(80% 0.008 84.6)",
+          "oklch(95% 0.008 84.6)"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#57524a",
+        "oklch": "oklch(44.1% 0.014 79.7)",
+        "tonalRamp": [
+          "oklch(15% 0.014 79.7)",
+          "oklch(25% 0.014 79.7)",
+          "oklch(35% 0.014 79.7)",
+          "oklch(45% 0.014 79.7)",
+          "oklch(55% 0.014 79.7)",
+          "oklch(65% 0.014 79.7)",
+          "oklch(80% 0.014 79.7)",
+          "oklch(95% 0.014 79.7)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Ochre Gold",
+        "canonical": "#855700",
+        "oklch": "oklch(49.5% 0.105 73.7)",
+        "tonalRamp": [
+          "oklch(15% 0.105 73.7)",
+          "oklch(25% 0.105 73.7)",
+          "oklch(35% 0.105 73.7)",
+          "oklch(45% 0.105 73.7)",
+          "oklch(55% 0.105 73.7)",
+          "oklch(65% 0.105 73.7)",
+          "oklch(80% 0.105 73.7)",
+          "oklch(95% 0.030 73.7)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Deep Ochre",
+        "canonical": "#6e4800",
+        "oklch": "oklch(43.4% 0.092 74.6)",
+        "tonalRamp": [
+          "oklch(15% 0.092 74.6)",
+          "oklch(25% 0.092 74.6)",
+          "oklch(35% 0.092 74.6)",
+          "oklch(45% 0.092 74.6)",
+          "oklch(55% 0.092 74.6)",
+          "oklch(65% 0.092 74.6)",
+          "oklch(80% 0.092 74.6)",
+          "oklch(95% 0.030 74.6)"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Gold Wash",
+        "canonical": "#f5ebd5",
+        "oklch": "oklch(94.2% 0.031 86.5)",
+        "tonalRamp": [
+          "oklch(15% 0.031 86.5)",
+          "oklch(25% 0.031 86.5)",
+          "oklch(35% 0.031 86.5)",
+          "oklch(45% 0.031 86.5)",
+          "oklch(55% 0.031 86.5)",
+          "oklch(65% 0.031 86.5)",
+          "oklch(80% 0.031 86.5)",
+          "oklch(95% 0.030 86.5)"
+        ]
+      },
+      "buy": {
+        "role": "tertiary",
+        "displayName": "Buy Green",
+        "canonical": "#146c3a",
+        "oklch": "oklch(46.9% 0.113 152.7)",
+        "tonalRamp": [
+          "oklch(15% 0.113 152.7)",
+          "oklch(25% 0.113 152.7)",
+          "oklch(35% 0.113 152.7)",
+          "oklch(45% 0.113 152.7)",
+          "oklch(55% 0.113 152.7)",
+          "oklch(65% 0.113 152.7)",
+          "oklch(80% 0.113 152.7)",
+          "oklch(95% 0.030 152.7)"
+        ]
+      },
+      "buy-soft": {
+        "role": "tertiary",
+        "displayName": "Mint Wash",
+        "canonical": "#e5f3ea",
+        "oklch": "oklch(95.1% 0.019 157.9)",
+        "tonalRamp": [
+          "oklch(15% 0.019 157.9)",
+          "oklch(25% 0.019 157.9)",
+          "oklch(35% 0.019 157.9)",
+          "oklch(45% 0.019 157.9)",
+          "oklch(55% 0.019 157.9)",
+          "oklch(65% 0.019 157.9)",
+          "oklch(80% 0.019 157.9)",
+          "oklch(95% 0.019 157.9)"
+        ]
+      },
+      "wait": {
+        "role": "tertiary",
+        "displayName": "Wait Red",
+        "canonical": "#b3261e",
+        "oklch": "oklch(50.1% 0.178 28.7)",
+        "tonalRamp": [
+          "oklch(15% 0.178 28.7)",
+          "oklch(25% 0.178 28.7)",
+          "oklch(35% 0.178 28.7)",
+          "oklch(45% 0.178 28.7)",
+          "oklch(55% 0.178 28.7)",
+          "oklch(65% 0.178 28.7)",
+          "oklch(80% 0.178 28.7)",
+          "oklch(95% 0.030 28.7)"
+        ]
+      },
+      "wait-soft": {
+        "role": "tertiary",
+        "displayName": "Rose Wash",
+        "canonical": "#fbe9e7",
+        "oklch": "oklch(94.8% 0.020 25.2)",
+        "tonalRamp": [
+          "oklch(15% 0.020 25.2)",
+          "oklch(25% 0.020 25.2)",
+          "oklch(35% 0.020 25.2)",
+          "oklch(45% 0.020 25.2)",
+          "oklch(55% 0.020 25.2)",
+          "oklch(65% 0.020 25.2)",
+          "oklch(80% 0.020 25.2)",
+          "oklch(95% 0.020 25.2)"
+        ]
+      },
+      "watch": {
+        "role": "tertiary",
+        "displayName": "Watch Amber",
+        "canonical": "#8a4a00",
+        "oklch": "oklch(47.7% 0.113 59.1)",
+        "tonalRamp": [
+          "oklch(15% 0.113 59.1)",
+          "oklch(25% 0.113 59.1)",
+          "oklch(35% 0.113 59.1)",
+          "oklch(45% 0.113 59.1)",
+          "oklch(55% 0.113 59.1)",
+          "oklch(65% 0.113 59.1)",
+          "oklch(80% 0.113 59.1)",
+          "oklch(95% 0.030 59.1)"
+        ]
+      },
+      "watch-soft": {
+        "role": "tertiary",
+        "displayName": "Apricot Wash",
+        "canonical": "#fcefd9",
+        "oklch": "oklch(95.7% 0.032 81.0)",
+        "tonalRamp": [
+          "oklch(15% 0.032 81.0)",
+          "oklch(25% 0.032 81.0)",
+          "oklch(35% 0.032 81.0)",
+          "oklch(45% 0.032 81.0)",
+          "oklch(55% 0.032 81.0)",
+          "oklch(65% 0.032 81.0)",
+          "oklch(80% 0.032 81.0)",
+          "oklch(95% 0.030 81.0)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The Nepal price per tola, tabular numerals. One per screen."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "The decision headline, in the decision's state colour."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page titles on Details, Settings and Login."
+      },
+      "title-sm": {
+        "displayName": "Title Small",
+        "purpose": "Panel titles."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "The decision's one-sentence summary, max 60ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reasons and paragraphs."
+      },
+      "body-sm": {
+        "displayName": "Body Small",
+        "purpose": "Panel sub-copy, tables, secondary text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, nav tabs, field labels."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Data age lines, chart ranges, rule names."
+      }
+    },
+    "shadows": [
+      {
+        "name": "button-lift",
+        "value": "0 1px 2px rgb(29 27 23 / 0.06)",
+        "purpose": "Refresh button in the header only."
+      },
+      {
+        "name": "popover",
+        "value": "0 4px 12px rgb(29 27 23 / 0.10)",
+        "purpose": "Refresh status message floating under the compact button."
+      }
+    ],
+    "motion": [
+      {
+        "name": "color-transition",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Tailwind transition-colors on buttons, links and nav tabs."
+      },
+      {
+        "name": "refresh-spin",
+        "value": "spin 1s linear infinite",
+        "purpose": "Refresh icon while prices are being re-checked."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      }
+    ],
+    "focus": {
+      "value": "outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 6px",
+      "purpose": "Global :focus-visible ring."
+    },
+    "layout": {
+      "maxWidth": "48rem",
+      "gutter": "16px",
+      "panelGap": "16px",
+      "minTapTarget": "44px"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main forward action on a surface, e.g. View detailed analysis, Add, Sign in.",
+      "html": "<button class=\"ds-btn-primary\">View detailed analysis <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/></svg></button>",
+      "css": ".ds-btn-primary { font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); border: none; background: var(--color-accent); color: #fff; font-weight: 600; } .ds-btn-primary:hover { background: var(--color-accent-hover); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.6; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Hairline-bordered action, e.g. I bought gold, Cancel, Sign out.",
+      "html": "<button class=\"ds-btn-secondary\">I bought gold</button>",
+      "css": ".ds-btn-secondary { font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); border: 1px solid var(--color-line); background: var(--color-panel); color: var(--color-ink); font-weight: 500; } .ds-btn-secondary:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); color: var(--color-accent); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis action such as Start a new plan.",
+      "html": "<button class=\"ds-btn-ghost\">Start a new plan</button>",
+      "css": ".ds-btn-ghost { font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); border: none; background: transparent; color: var(--color-ink-2); font-weight: 500; } .ds-btn-ghost:hover { background: var(--color-ground); color: var(--color-ink); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Refresh Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Header control that re-checks daily prices; icon spins while busy.",
+      "html": "<button class=\"ds-btn-refresh\" aria-label=\"Refresh prices\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\"/><path d=\"M21 3v5h-5\"/><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\"/><path d=\"M8 16H3v5\"/></svg><span>Refresh</span></button>",
+      "css": ".ds-btn-refresh { font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; transition: color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); padding: 0 12px; border: 1px solid var(--color-line); background: var(--color-panel); color: var(--color-ink); font-weight: 500; box-shadow: 0 1px 2px rgb(29 27 23 / 0.06); } .ds-btn-refresh:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, transparent); color: var(--color-accent); } .ds-btn-refresh:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Labelled field, 44px tall, 1rem text so phones do not zoom.",
+      "html": "<label class=\"ds-field\"><span>Add a level (US$ per ounce)</span><input class=\"ds-input\" inputmode=\"decimal\" placeholder=\"4000\"></label>",
+      "css": ".ds-field { font-family: var(--font-sans); display: grid; gap: 4px; font-size: 0.875rem; color: var(--color-ink); } .ds-field span { font-weight: 500; } .ds-input { font-family: var(--font-sans); min-height: 44px; width: 10rem; padding: 0 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-panel); color: var(--color-ink); font-size: 1rem; font-variant-numeric: tabular-nums; } .ds-input::placeholder { color: color-mix(in srgb, var(--color-ink-2) 70%, transparent); } .ds-input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Navigation Tabs",
+      "kind": "nav",
+      "refersTo": "nav-tab",
+      "description": "Today, Details, Settings tabs in the sticky header.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><a class=\"ds-nav-tab\" aria-current=\"page\" href=\"#\">Today</a><a class=\"ds-nav-tab\" href=\"#\">Details</a><a class=\"ds-nav-tab\" href=\"#\">Settings</a></nav>",
+      "css": ".ds-nav { font-family: var(--font-sans); display: flex; gap: 4px; } .ds-nav-tab { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 8px; font-size: 0.875rem; font-weight: 500; color: var(--color-ink-2); text-decoration: none; transition: color 150ms, background-color 150ms; } .ds-nav-tab:hover { background: color-mix(in srgb, var(--color-line) 50%, transparent); color: var(--color-ink); } .ds-nav-tab[aria-current=\"page\"] { background: var(--color-accent-soft); color: var(--color-accent); } .ds-nav-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Watch Level Chip",
+      "kind": "chip",
+      "refersTo": "chip-level",
+      "description": "Removable watch-level value on Settings.",
+      "html": "<span class=\"ds-chip\">$4,000<button class=\"ds-chip-x\" aria-label=\"Remove $4000\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg></button></span>",
+      "css": ".ds-chip { font-family: var(--font-sans); display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 12px; border: 1px solid var(--color-line); border-radius: 9999px; background: var(--color-ground); color: var(--color-ink); font-size: 0.875rem; font-variant-numeric: tabular-nums; } .ds-chip-x { display: grid; place-items: center; width: 40px; height: 40px; border: none; border-radius: 9999px; background: transparent; color: var(--color-ink-2); cursor: pointer; } .ds-chip-x:hover { background: var(--color-line); color: var(--color-ink); } .ds-chip-x:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "White content panel with hairline border and optional title row.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-panel-title\">Nepal gold today</h2><p class=\"ds-price\">Rs 2,74,300</p><p class=\"ds-caption\">per tola, hallmark gold (छापावाल सुन), FENEGOSIDA</p></section>",
+      "css": ".ds-panel { font-family: var(--font-sans); padding: 16px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-panel); color: var(--color-ink); } .ds-panel-title { margin: 0 0 12px; font-size: 1rem; line-height: 1.5rem; font-weight: 600; } .ds-price { margin: 0; font-size: 2.25rem; line-height: 2.5rem; font-weight: 600; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; } .ds-caption { margin: 4px 0 0; font-size: 0.875rem; color: var(--color-ink-2); }"
+    },
+    {
+      "name": "Decision Panel (Buy)",
+      "kind": "custom",
+      "refersTo": "decision-panel-buy",
+      "description": "Signature first block on Today: pill, coloured headline, summary, age line. Wait and Watch variants swap the state tokens.",
+      "html": "<section class=\"ds-decision\"><span class=\"ds-pill\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.25\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"m9 12 2 2 4-4\"/></svg>Buy</span><h1 class=\"ds-decision-head\">Today is a reasonable day to buy</h1><p class=\"ds-decision-sum\">Nepal's price has not caught up with the recent rise in world gold.</p><p class=\"ds-decision-age\">Advice updated 4 min ago</p></section>",
+      "css": ".ds-decision { font-family: var(--font-sans); padding: 16px; border: 1px solid color-mix(in srgb, var(--color-buy) 25%, transparent); border-radius: 12px; background: var(--color-buy-soft); } .ds-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid color-mix(in srgb, var(--color-buy) 25%, transparent); border-radius: 9999px; background: var(--color-buy-soft); color: var(--color-buy); font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; } .ds-decision-head { margin: 12px 0 0; font-size: 1.75rem; line-height: 1.25; font-weight: 600; letter-spacing: -0.025em; color: var(--color-buy); } .ds-decision-sum { margin: 8px 0 0; max-width: 60ch; font-size: 1.125rem; line-height: 1.625; color: var(--color-ink); } .ds-decision-age { margin: 12px 0 0; font-size: 0.75rem; line-height: 1rem; color: var(--color-ink-2); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Plain Answer",
+    "overview": "Gold Advisor looks like a conventional personal-finance app, played straight. The owner chose this \"plain and standard\" look on 2026-11-02, so the system has no themed visual world. It uses a light warm-neutral page, white panels with 1px hairline borders, the device's own sans-serif, and one ochre-gold accent. The screen leads with the advice in words. Prices and charts come after it, and they never lead.\n\nThe layout is a single column sized for a phone and capped at a reading width on larger screens. Density is moderate: 16px between panels, 16 to 20px inside them, and every control at least 44px tall. Colour carries meaning in one place only, the decision. Green, red and amber appear for BUY, WAIT and WATCH CLOSELY, and each is always paired with an icon and a text label. Everything else stays neutral, so the decision is the only coloured block on the page.\n\nDepth is flat. Panels are separated by borders and the warm ground, not by shadows. The build uses only two small shadows: one on the Refresh button and one on its status popover.",
+    "keyCharacteristics": [
+      "Warm off-white ground (#f6f4ef) with white panels and 1px warm-grey hairlines",
+      "System UI sans for everything, with tabular numerals on every price and number column",
+      "One ochre-gold accent for actions, the active tab, focus rings and the price line",
+      "Decision state colours used only for the decision, always with icon plus label",
+      "Flat surfaces, 8px radius on controls and 12px on panels, 44px minimum tap targets",
+      "Lucide line icons at 16 to 20px, decorative and `aria-hidden`"
+    ],
+    "rules": [
+      {
+        "name": "The Decision Owns Colour Rule",
+        "body": "Buy Green, Wait Red and Watch Amber appear only for the decision and its direct consequences (errors use Wait Red, success uses Buy Green, chart support and resistance use them). Nothing decorative may use them.",
+        "section": "colors"
+      },
+      {
+        "name": "The Icon And Word Rule",
+        "body": "A state colour is never the only signal. Every decision pill pairs its colour with a Lucide icon (CircleCheck, Hourglass, Eye) and a word.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accent Is Not A Verdict Rule",
+        "body": "Ochre Gold and Watch Amber sit close in hue (about 74° and 59° in OKLCH). Ochre Gold marks actions and focus only; never use it to fill a decision panel or pill.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Every price, percentage and number column uses tabular numerals so digits line up and do not shift on refresh.",
+        "section": "typography"
+      },
+      {
+        "name": "The Age Line Rule",
+        "body": "Every number is followed by a caption or small line in Muted Ink saying how old it is and where it came from.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Panel Rule",
+        "body": "Panels and cards never take a shadow. Only small floating or header controls may lift.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** put the decision panel first, above any price or chart.",
+      "**Do** pair every state colour with a Lucide icon and a word.",
+      "**Do** follow every number with its age and source in a Muted Ink caption.",
+      "**Do** use tabular numerals for prices, percentages and table numbers.",
+      "**Do** keep every tappable control at least 44px tall.",
+      "**Do** separate surfaces with 1px Hairline borders on the Warm Paper ground.",
+      "**Do** use the global 2px Ochre Gold focus ring, offset 2px."
+    ],
+    "donts": [
+      "**Don't** use Buy Green, Wait Red or Watch Amber for decoration, branding or non-decision emphasis.",
+      "**Don't** fill a decision panel or pill with Ochre Gold.",
+      "**Don't** add shadows to panels or cards.",
+      "**Don't** add a webfont or a themed visual world; the owner chose the plain, standard look.",
+      "**Don't** show placeholder or demo prices; use the empty and loading panels instead."
+    ]
+  }
+}

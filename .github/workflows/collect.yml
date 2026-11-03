@@ -1,0 +1,64 @@
+# Every 30 minutes: collect prices, run the analysis, run the AI only when something
+# significant changed, and save everything to Neon.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   NEON_DATABASE_URL      Neon connection string (direct, not pooled)
+#   GA_OPENROUTER_API_KEY  OpenRouter key; free models only. Optional: without it the AI step is skipped.
+name: collect
+
+on:
+  schedule:
+    # Odd minutes: GitHub delays runs scheduled on the hour. UTC.
+    - cron: "7,37 * * * *"
+  workflow_dispatch: {}
+
+# Never run two cycles at once; a late run waits instead of overlapping.
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+      GA_OPENROUTER_API_KEY: ${{ secrets.GA_OPENROUTER_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}/runner
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/pyproject.toml
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/dukascopy/package-lock.json
+
+      - name: Install
+        run: |
+          uv pip install --system -e backend
+          npm ci --prefix backend/dukascopy --omit=dev --ignore-scripts --no-audit --no-fund
+
+      - name: Check secrets
+        run: |
+          if [ -z "$GA_DATABASE_URL" ]; then echo "::error::Add the NEON_DATABASE_URL repository secret."; exit 1; fi
+
+      - name: Database migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Collect, analyse, AI
+        run: python -m gold_advisor.cycle
