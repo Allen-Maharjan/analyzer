@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { CandleChart } from "@/components/CandleChart";
+import { CandleChart, OVERLAYS, PANELS, type IndicatorPoint, type OverlayId, type PanelId } from "@/components/CandleChart";
 import { nepalTime, usd } from "@/lib/format";
 
 type Candle = { bucket_start: string; open: number; high: number; low: number; close: number };
@@ -15,6 +15,38 @@ const OPTIONS: { value: Timeframe; label: string }[] = [
   { value: "1D", label: "1 day" },
 ];
 const SOURCE_NAMES: Record<string, string> = { gold_api: "Gold API", swissquote: "Swissquote" };
+const DEFAULT_OVERLAYS: OverlayId[] = ["averages"];
+const DEFAULT_PANELS: PanelId[] = ["rsi", "macd"];
+const STORAGE_KEY = "chart-indicators-v1";
+
+/** Remember which indicators the owner turned on. Browser storage can be unavailable; then use defaults. */
+function loadChoice(): { overlays: OverlayId[]; panels: PanelId[] } {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null");
+    if (saved && Array.isArray(saved.overlays) && Array.isArray(saved.panels)) {
+      return {
+        overlays: saved.overlays.filter((o: string) => OVERLAYS.some((x) => x.id === o)),
+        panels: saved.panels.filter((p: string) => PANELS.some((x) => x.id === p)),
+      };
+    }
+  } catch {}
+  return { overlays: DEFAULT_OVERLAYS, panels: DEFAULT_PANELS };
+}
+
+function Chip({ on, label, onClick }: { on: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={`inline-flex min-h-9 items-center rounded-full border px-3 text-sm transition-colors ${
+        on ? "border-accent/40 bg-accent-soft font-medium text-accent-hover" : "border-line bg-panel text-ink-2 hover:bg-hover hover:text-ink"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 export function WorldChart({ asset, label, initialCandles, levels }: {
   asset: string; label: string; initialCandles: Candle[]; levels: Level[];
@@ -26,6 +58,25 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
   const [candleError, setCandleError] = useState(false);
   const [quoteError, setQuoteError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [indicators, setIndicators] = useState<{ timeframe: Timeframe; points: IndicatorPoint[] }>({ timeframe: "15m", points: [] });
+  const [indicatorError, setIndicatorError] = useState(false);
+  const [overlays, setOverlays] = useState<OverlayId[]>(DEFAULT_OVERLAYS);
+  const [panels, setPanels] = useState<PanelId[]>(DEFAULT_PANELS);
+
+  useEffect(() => {
+    const saved = loadChoice();
+    setOverlays(saved.overlays);
+    setPanels(saved.panels);
+  }, []);
+
+  function save(next: { overlays: OverlayId[]; panels: PanelId[] }) {
+    setOverlays(next.overlays);
+    setPanels(next.panels);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {}
+  }
+  const toggle = <T,>(list: T[], id: T) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +92,7 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
       const timeout = window.setTimeout(() => controller?.abort(), 20_000);
       const query = new URLSearchParams({ asset, timeframe });
       const quoteQuery = new URLSearchParams({ asset });
-      const [bars, spot] = await Promise.allSettled([
+      const [bars, spot, ind] = await Promise.allSettled([
         fetch(`/api/market/candles?${query}`, { cache: "no-store", signal: controller.signal }).then(async (r) => {
           if (!r.ok) throw new Error("candles unavailable");
           return r.json() as Promise<{ candles: Candle[] }>;
@@ -49,6 +100,10 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
         fetch(`/api/market/quote?${quoteQuery}`, { cache: "no-store", signal: controller.signal }).then(async (r) => {
           if (!r.ok) throw new Error("quote unavailable");
           return r.json() as Promise<Quote>;
+        }),
+        fetch(`/api/market/indicators?${query}`, { cache: "no-store", signal: controller.signal }).then(async (r) => {
+          if (!r.ok) throw new Error("indicators unavailable");
+          return r.json() as Promise<{ points: IndicatorPoint[] }>;
         }),
       ]);
       window.clearTimeout(timeout);
@@ -63,6 +118,10 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
         setQuote(spot.value);
         setQuoteError(false);
       } else setQuoteError(true);
+      if (ind.status === "fulfilled") {
+        setIndicators({ timeframe, points: ind.value.points });
+        setIndicatorError(false);
+      } else setIndicatorError(true);
     }
 
     function onVisibility() { if (document.visibilityState === "visible") void update(); }
@@ -78,6 +137,7 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
   }, [asset, timeframe]);
 
   const lastBar = candles.at(-1);
+  const points = indicators.timeframe === timeframe ? indicators.points : [];
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -94,14 +154,43 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
           {quote ? <>Spot {usd(Number(quote.price))} · {SOURCE_NAMES[quote.source] ?? quote.source} · {nepalTime(quote.observed_at)} · {quoteError ? "update failed" : quote.freshness.status.replaceAll("_", " ")}</> : "Spot price unavailable"}
         </p>
       </div>
-      {candles.length > 0 ? <CandleChart candles={candles} levels={levels} timeframe={timeframe} label={label} /> :
-        <p className="py-12 text-ink-2">{loading ? "Loading price history…" : "No price history available."}</p>}
+      <div className="mb-3 space-y-2">
+        <div role="group" aria-label="Draw on the price chart" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs text-ink-2">On the chart</span>
+          {OVERLAYS.map((o) => (
+            <Chip key={o.id} label={o.label} on={overlays.includes(o.id)} onClick={() => save({ overlays: toggle(overlays, o.id), panels })} />
+          ))}
+        </div>
+        <div role="group" aria-label="Indicator panels under the chart" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs text-ink-2">Panels below</span>
+          {PANELS.map((p) => (
+            <Chip key={p.id} label={p.label} on={panels.includes(p.id)} onClick={() => save({ overlays, panels: toggle(panels, p.id) })} />
+          ))}
+        </div>
+      </div>
+      {candles.length > 0 ? (
+        <CandleChart
+          candles={candles}
+          levels={levels}
+          timeframe={timeframe}
+          label={label}
+          indicators={points}
+          overlays={overlays}
+          panels={PANELS.map((p) => p.id).filter((id) => panels.includes(id))}
+        />
+      ) : (
+        <p className="py-12 text-ink-2">{loading ? "Loading price history…" : "No price history available."}</p>
+      )}
       <p className="mt-3 text-sm leading-relaxed text-ink-2">
         {lastBar ? `Last completed bar starts ${nepalTime(lastBar.bucket_start)} Nepal time. ` : ""}
         Bars are Dukascopy bid prices; spot is a separate quote. Checks every minute while this page is open.
         {candleError ? (candles.length ? " Price history could not be updated; showing the last available bars." : " Price history could not be updated.") : ""}
+        {indicatorError && candles.length ? " Indicators could not be loaded right now." : ""}
       </p>
-      <p className="mt-1 text-sm text-ink-2">Dotted lines show daily support and resistance from the saved analysis; a solid line marks a watch level.</p>
+      <p className="mt-1 text-sm text-ink-2">
+        Dotted lines show daily support and resistance from the saved analysis; a solid line marks a watch level. Indicators use the same
+        bars as the chart; dashed lines in the panels mark their usual thresholds (for example RSI 30 and 70). Tap or hover to read values.
+      </p>
     </div>
   );
 }

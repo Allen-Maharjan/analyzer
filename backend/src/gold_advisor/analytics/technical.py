@@ -24,7 +24,7 @@ def _signal(key, name, value, direction, reading, explain) -> dict:
     return {"key": key, "name": name, "value": value, "signal": direction, "reading": reading, "explain": explain}
 
 
-def signals(ind: pd.DataFrame, rupees_per_usd_oz: float | None = None) -> dict:
+def signals(ind: pd.DataFrame, rupees_per_usd_oz: float | None = None, label: str = "Gold") -> dict:
     if len(ind) < 2:
         return {"signals": [], "tally": {"up": 0, "down": 0, "neutral": 0}}
     last, prev = ind.iloc[-1], ind.iloc[-2]
@@ -84,8 +84,9 @@ def signals(ind: pd.DataFrame, rupees_per_usd_oz: float | None = None) -> dict:
     atr = _f(last["atr_14"])
     if atr:
         rs = f" (about Rs {atr * rupees_per_usd_oz:,.0f} per tola in Nepal)" if rupees_per_usd_oz else ""
-        out.append(_signal("atr", "ATR (14)", f"${atr:,.0f} · {atr / close * 100:.1f}%", 0,
-                           f"Gold typically moves about ${atr:,.0f} in one bar{rs}.",
+        move = f"${atr:,.2f}" if atr < 10 else f"${atr:,.0f}"  # silver moves cents, gold dollars
+        out.append(_signal("atr", "ATR (14)", f"{move} · {atr / close * 100:.1f}%", 0,
+                           f"{label} typically moves about {move} in one bar{rs}.",
                            "Average true range: the usual size of one bar's move."))
 
     vol = _f(last["realized_vol"])

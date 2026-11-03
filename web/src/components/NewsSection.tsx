@@ -4,7 +4,7 @@ import { ChevronDown, ExternalLink, Flag, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { ago, nepalTime } from "@/lib/format";
+import { ago, nepalTime, stamp } from "@/lib/format";
 import type { NewsOverview } from "@/lib/news";
 
 const STATE_WORDS: Record<string, string> = {
@@ -76,7 +76,7 @@ export function NewsSection({ news, asset, label }: { news: NewsOverview; asset:
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-ink-2">
           {s.refreshing ? STATE_WORDS.pending : STATE_WORDS[s.state] ?? s.state}
-          {s.refreshed_at && (s.state === "fresh" || s.state === "stale") ? ` ${ago(s.refreshed_at)}` : ""}
+          {s.refreshed_at && (s.state === "fresh" || s.state === "stale") ? ` ${stamp(s.refreshed_at)}` : ""}
           {s.last_attempt_failed && !s.refreshing ? " · the last check failed" : ""}
         </p>
         <button
@@ -105,7 +105,7 @@ export function NewsSection({ news, asset, label }: { news: NewsOverview; asset:
       {news.ai && (
         <div className="mb-4">
           <p className="max-w-[65ch] text-[17px] leading-relaxed">{news.ai.summary}</p>
-          <p className="mt-1 text-xs text-ink-2">AI summary of the articles marked below · {ago(news.ai.finished_at)}</p>
+          <p className="mt-1 text-xs text-ink-2">AI summary of the articles marked below · {stamp(news.ai.finished_at)}</p>
         </div>
       )}
 

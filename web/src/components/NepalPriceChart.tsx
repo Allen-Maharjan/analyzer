@@ -21,7 +21,8 @@ export function NepalPriceChart({ points }: { points: Point[] }) {
       handleScroll: false,
       handleScale: false,
       crosshair: { horzLine: { visible: false } },
-      localization: { priceFormatter: (p: number) => `${(p / 100000).toFixed(2)}L` },
+      // Lakh notation for gold (Rs 2,75,000 -> 2.75L); plain rupees for silver (Rs 3,675).
+      localization: { priceFormatter: (p: number) => (p >= 100000 ? `${(p / 100000).toFixed(2)}L` : Math.round(p).toLocaleString("en-IN")) },
     });
     const series = chart.addSeries(LineSeries, { color: "#a16207", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
     series.setData(points.map((p) => ({ time: (Date.parse(`${p.date}T00:00:00Z`) / 1000) as UTCTimestamp, value: p.price })));

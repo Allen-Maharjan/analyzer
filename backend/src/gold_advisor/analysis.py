@@ -251,7 +251,7 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
     full_d1 = bars[Timeframe.D1] if bars[Timeframe.D1].empty else _candles(session, Timeframe.D1, limit=4000, asset=asset)
     forecasts = forecast.forecast(indicators.compute(full_d1, Timeframe.D1), price_now, rupee_factor, asset.label) if len(full_d1) else []
     technical_detail = {
-        tf.value: technical.signals(ind_by_tf[tf], rupee_factor)
+        tf.value: technical.signals(ind_by_tf[tf], rupee_factor, asset.label)
         for tf in (Timeframe.H1, Timeframe.H4, Timeframe.D1, Timeframe.W1)
         if tf in ind_by_tf
     }

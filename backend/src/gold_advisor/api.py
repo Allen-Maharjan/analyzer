@@ -289,6 +289,68 @@ def candles(
     )
 
 
+# Indicator series for the chart. Same formulas as the analysis (analytics/indicators.py).
+INDICATOR_FIELDS = (
+    "sma_50", "sma_200", "bb_upper", "bb_middle", "bb_lower", "rsi_14", "macd", "macd_signal", "macd_hist",
+    "stoch_k", "stoch_d", "adx_14", "plus_di", "minus_di", "atr_14", "realized_vol",
+)
+# Extra bars loaded before the visible window so the 200-bar average is defined from the first bar shown.
+INDICATOR_WARMUP_BARS = 300
+
+
+class IndicatorPointOut(BaseModel):
+    bucket_start: datetime
+    values: dict[str, float | None]
+
+
+class IndicatorSeriesOut(BaseModel):
+    instrument: str
+    timeframe: Timeframe
+    fields: list[str]
+    points: list[IndicatorPointOut]
+
+
+@app.get("/api/v1/indicators", response_model=IndicatorSeriesOut)
+def indicator_series(
+    session: SessionDep,
+    asset: AssetDep,
+    timeframe: Timeframe,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 192,
+) -> IndicatorSeriesOut:
+    import math
+
+    import pandas as pd
+
+    from gold_advisor.analytics import indicators
+
+    try:
+        query = market_data.MarketQuery(asset, timeframe, None, None, limit + INDICATOR_WARMUP_BARS)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    rows = market_data.candles(session, query)
+    if not rows:
+        return IndicatorSeriesOut(instrument=asset.instrument, timeframe=timeframe, fields=list(INDICATOR_FIELDS), points=[])
+    bars = pd.DataFrame(
+        [(r.bucket_start, float(r.open), float(r.high), float(r.low), float(r.close)) for r in rows],
+        columns=["bucket_start", "open", "high", "low", "close"],
+    ).set_index("bucket_start")
+    ind = indicators.compute(bars, timeframe).tail(limit)
+
+    def clean(value) -> float | None:
+        number = float(value)
+        return None if math.isnan(number) or math.isinf(number) else round(number, 4)
+
+    return IndicatorSeriesOut(
+        instrument=asset.instrument,
+        timeframe=timeframe,
+        fields=list(INDICATOR_FIELDS),
+        points=[
+            IndicatorPointOut(bucket_start=ts, values={f: clean(row[f]) for f in INDICATOR_FIELDS})
+            for ts, row in ind.iterrows()
+        ],
+    )
+
+
 @app.get("/api/v1/nepal-rates", response_model=list[LocalRateOut])
 def nepal_rates(
     session: SessionDep,

@@ -12,7 +12,7 @@ import type { NewsOverview } from "@/lib/news";
 import { PROVIDER_NAMES, type AiOverview } from "@/lib/ai";
 import { BackendError, backend, backendOrNull, type Dashboard } from "@/lib/backend";
 import { withAsset } from "@/lib/asset";
-import { ago, nepalDate, nepalTime, rupees } from "@/lib/format";
+import { nepalDate, nepalTime, rupees, stamp } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,8 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const headline = stripped.charAt(0).toUpperCase() + stripped.slice(1);
   const WORDS: Record<string, string> = { bearish: "lower", neutral: "about the same", bullish: "higher" };
   const history = d.prices.nepal_history;
-  const previous = history.length >= 2 ? history[history.length - 2].price : null;
+  const previousPoint = history.length >= 2 ? history[history.length - 2] : null;
+  const previous = previousPoint?.price ?? null;
   const change = previous != null && d.prices.nepal_per_tola != null ? d.prices.nepal_per_tola - previous : null;
   const sourceNames = Object.fromEntries(d.sources.map(s => [s.dataset, s.dataset === "usd_npr" ? "Dollar rate" : s.dataset.startsWith("nepal_") ? `Nepal ${label}` : s.dataset.endsWith("_spot") ? `World ${label}` : s.dataset]));
   const sources = d.sources.filter(s => s.dataset === "usd_npr" || s.dataset.startsWith("nepal_") || s.dataset.endsWith("_spot"));
@@ -82,6 +83,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         <p className="mt-4 text-sm text-ink-2">
           {CONFIDENCE_WORDS[d.confidence] ?? d.confidence} · Check again {d.next_review.charAt(0).toLowerCase() + d.next_review.slice(1)}
         </p>
+        <p className="num mt-1 text-xs text-ink-2">Advice updated {stamp(d.created_at)}</p>
         {d.news_risk && (
           <p className="mt-3 border-t border-wait/15 pt-3 text-sm text-ink">
             The numbers alone say <span className="font-semibold">{d.news_risk.original_decision === "BUY" ? "Buy" : d.news_risk.original_decision}</span>.
@@ -117,15 +119,15 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
           <>
             <p className="num text-4xl font-semibold tracking-tight">{rupees(d.prices.nepal_per_tola)}</p>
             <p className="mt-1 text-sm text-ink-2">
-              {d.asset.local_label} ·{" "}
+              {d.asset.local_label} · Updated{" "}
               {d.prices.nepal_time_known && d.prices.nepal_published_at
                 ? nepalTime(d.prices.nepal_published_at)
                 : nepalDate(d.prices.nepal_date)}
               {change != null && change !== 0 && (
                 <>
                   {" · "}
-                  <span className={`num whitespace-nowrap font-medium ${change > 0 ? "text-wait" : "text-buy"}`}>
-                    {change > 0 ? "up" : "down"} {rupees(Math.abs(change))} since last update
+                  <span className={`num whitespace-nowrap font-medium ${change > 0 ? "text-buy" : "text-wait"}`}>
+                    {change > 0 ? "up" : "down"} {rupees(Math.abs(change))} since {nepalDate(previousPoint?.date)}
                   </span>
                 </>
               )}
@@ -137,7 +139,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         )}
       </Section>
 
-      <Section title="Why">
+      <Section title="Why" updated={d.created_at}>
         <ul className="space-y-3 text-[17px] leading-relaxed">
           {d.reasons.map((reason) => (
             <li key={reason.plain} className="flex gap-3">
@@ -155,7 +157,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </Link>
       </Section>
 
-      <Section title="What would change this">
+      <Section title="What would change this" updated={d.created_at}>
         <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
         {d.next_event && (
           <p className="mt-3 text-[15px] text-ink-2">
@@ -164,12 +166,12 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         )}
       </Section>
 
-      <Section title="AI's take">
+      <Section title="AI's take" updated={ai?.result?.finished_at}>
         {ai?.result ? (
           <>
             <p className="text-[17px] leading-relaxed">{ai.result.output.plain_summary}</p>
             <p className="mt-2 text-xs text-ink-2">
-              {PROVIDER_NAMES[ai.result.provider] ?? ai.result.provider} · {ago(ai.result.finished_at)} · checked against the
+              {PROVIDER_NAMES[ai.result.provider] ?? ai.result.provider} · checked against the
               app's own numbers
             </p>
           </>
@@ -188,7 +190,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       </Section>
 
       {d.forecasts.length > 0 && (
-        <Section title={`What might happen to world ${label}`}>
+        <Section title={`What might happen to world ${label}`} updated={d.created_at}>
           <ul className="space-y-5">
             {d.forecasts.map((f) => (
               <li key={f.label}>
@@ -238,7 +240,7 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <footer className="mt-6 px-1 text-xs leading-relaxed text-ink-2">
-        <p>Advice updated {ago(d.created_at)}.</p>
+        <p className="num">Advice updated {stamp(d.created_at)}.</p>
         <p className={problems.length ? "font-medium text-ink" : ""}>
           {sources
             .map((s) => `${sourceNames[s.dataset]} ${STATUS_WORDS[s.status] ?? s.status}`)

@@ -9,6 +9,8 @@ test("builds bounded asset-specific chart requests", () => {
     { path: "/api/v1/quotes/latest?asset=NEPSE%3ANABIL" });
   assert.deepEqual(marketPath("candles", new URLSearchParams()),
     { path: "/api/v1/candles?asset=gold&timeframe=15m&limit=192" });
+  assert.deepEqual(marketPath("indicators", new URLSearchParams("asset=silver&timeframe=1D")),
+    { path: "/api/v1/indicators?asset=silver&timeframe=1D&limit=192" });
 });
 
 test("rejects invalid identifiers, timeframes, and resources", () => {

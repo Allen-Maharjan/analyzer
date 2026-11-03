@@ -45,6 +45,12 @@ export function nepalDate(isoDate: string | null | undefined): string {
   );
 }
 
+/** "3 Nov, 2:15 pm · 4 min ago": when something was worked out, as a date and as an age. */
+export function stamp(iso: string | null | undefined): string {
+  if (!iso) return "not yet";
+  return `${nepalTime(iso)} · ${ago(iso)}`;
+}
+
 export function ago(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "never";
   const minutes = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));

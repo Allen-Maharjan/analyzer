@@ -162,7 +162,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         <DecisionLabel decision={s.decision.decision} /> · {nepalTime(s.created_at)}
       </p>
 
-      <Section title="Reasons">
+      <Section title="Reasons" updated={s.created_at}>
         <ul className="space-y-5">
           {s.decision.reasons.map((r) => (
             <li key={r.plain}>
@@ -178,7 +178,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
       </Section>
 
       {s.technical && (
-        <Section title="Indicators">
+        <Section title="Indicators" updated={s.created_at}>
           <div className="mb-4 grid grid-cols-4 gap-2 text-center text-xs">
             {["1h", "4h", "1D", "1W"].filter((tf) => s.technical?.[tf]).map((tf) => {
               const t = s.technical![tf].tally;
@@ -215,7 +215,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
       )}
 
       {s.forecasts && s.forecasts.length > 0 && (
-        <Section title="Scenarios">
+        <Section title="Scenarios" updated={s.created_at}>
           <p className="mb-3 text-sm leading-relaxed text-ink-2">
             For each time span, the app finds up to 100 past days most like today (trend, momentum, RSI, recent move,
             volatility) and counts what happened next. Ranges are the 10th to 90th percentile of those outcomes.
@@ -263,7 +263,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
       )}
 
       {s.price_levels && (s.price_levels.pivots || s.price_levels.fibonacci) && (
-        <Section title="Price levels">
+        <Section title="Price levels" updated={s.created_at}>
           {s.price_levels.pivots && (
             <>
               <p className="text-sm text-ink-2">
@@ -352,7 +352,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         )}
       </Section>
 
-      <Section title="Market score">
+      <Section title="Market score" updated={s.created_at}>
         <p className="text-4xl">{score(s.score.deterministic)}</p>
         <p className="mt-1 text-sm text-ink-2">
           From −100 (falling hard) to +100 (rising hard) · {s.score.outlook ?? "unknown"} · {Math.round(s.score.coverage * 100)}% of data available
@@ -375,7 +375,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         </ul>
       </Section>
 
-      <Section title="By time scale">
+      <Section title="By time scale" updated={s.created_at}>
         <ul className="divide-y divide-line">
           {TIMEFRAMES.filter((tf) => s.timeframes[tf]).map((tf) => {
             const t = s.timeframes[tf];
@@ -402,7 +402,7 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
         <p className="mt-3 text-sm text-ink-2">RSI above 70 means recently very strong, below 30 very weak.</p>
       </Section>
 
-      <Section title="Nepal vs world price">
+      <Section title="Nepal vs world price" updated={s.created_at}>
         <p className="mb-3 text-sm leading-relaxed text-ink-2">
           World {snapshot.asset.label.toLowerCase()} converted to rupees per tola (price × dollar rate × 0.375). Nepal's price normally sits a steady
           amount above it because of duty and dealer costs.
