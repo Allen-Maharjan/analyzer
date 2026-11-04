@@ -76,6 +76,13 @@ def test_buy_no_longer_needs_nepal_to_have_dropped():
     assert decide(inputs(lag=unchanged, h4_stabilized=False)).decision is Decision.WATCH_CLOSELY
 
 
+def test_expected_rise_in_nepal_price_still_buys():
+    rising = lag(expected_adjustment_pct=0.02, adjustment_pending=True)
+    result = decide(inputs(lag=rising, h4_stabilized=True, next_price=280000, next_price_change_pct=0.02))
+    assert result.decision is Decision.BUY and result.rule == "expected_higher_next"
+    assert decide(inputs(lag=rising, h4_stabilized=False)).decision is Decision.WATCH_CLOSELY
+
+
 def test_buy_turns_into_wait_when_tomorrow_is_expected_cheaper():
     buy_setup = dict(lag=lag(nepal_change_3_publications=-6000, nepal_change_3_publications_pct=-0.021), h4_stabilized=True)
     result = decide(inputs(**buy_setup, next_price=272000, next_price_change_pct=-0.0084))

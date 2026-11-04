@@ -5,7 +5,8 @@ Rules apply in strict precedence (first match wins):
 2. WAIT when a major event is within 24 h, world gold fell more than 2% since Nepal's last
    publication, or a confirmed breakdown still has strong downside momentum and the 4-hour
    chart has not paused (a breakdown whose fall has paused no longer forces WAIT).
-3. BUY when the expected Nepal adjustment has cleared and two completed 4-hour candles show no
+3. BUY when the expected Nepal adjustment has cleared (or Nepal's price is expected to rise, which
+   makes today the cheaper day; rules-5) and two completed 4-hour candles show no
    new selloff low with improving RSI or MACD. If that holds but Nepal's next price is expected at
    least 0.5% lower (the next-price forecast), WAIT for it instead. BUY no longer needs Nepal's
    price to have dropped first (rules-4): a two-year replay found that requirement made the advice
@@ -21,7 +22,7 @@ from gold_advisor.assets import AssetDefinition, GOLD
 from gold_advisor.decision.nepal import NepalLag
 from gold_advisor.domain import Confidence, Decision, Outlook
 
-VERSION = "rules-4"
+VERSION = "rules-5"
 WAIT_EVENT_HOURS = 24
 WAIT_INTL_DECLINE = -0.02
 REVIEW_AFTER_DAYS = 7
@@ -263,8 +264,9 @@ def decide(inp: DecisionInputs) -> DecisionResult:
         # A recent breakdown whose fall has paused: not a reason to wait on its own, but still a risk.
         downside.append(f"World {inp.asset.label.lower()} recently broke below an important price floor; the fall has paused but could resume.")
 
-    # 3. Conditions to buy.
-    if lag.adjustment_pending is False and inp.h4_stabilized:
+    # 3. Conditions to buy. A pending rise in Nepal's price doesn't block BUY: today is the cheaper day.
+    rise_pending = bool(lag.adjustment_pending and (lag.expected_adjustment_pct or 0) > 0)
+    if (lag.adjustment_pending is False or rise_pending) and inp.h4_stabilized:
         limit = inp.asset.buy_block_expected_drop_pct
         if limit is not None and inp.next_price_change_pct is not None and inp.next_price_change_pct <= limit and inp.next_price is not None:
             reasons.append(
@@ -283,6 +285,16 @@ def decide(inp: DecisionInputs) -> DecisionResult:
                 "Nepal publishing the lower price, after which buying may make sense.",
             )
         reasons.append(Reason("World prices have stopped falling for now.", inp.h4_detail))
+        if rise_pending:
+            return result(
+                Decision.BUY,
+                "expected_higher_next",
+                "Good time to buy",
+                "World prices have risen since Nepal set today's price, so Nepal's price will probably go up at the next update. "
+                "World prices aren't falling and no big announcement is close, so today's price is likely the better one.",
+                "Before buying, check that today's price is still the one shown here.",
+                "World prices falling back before Nepal's next update.",
+            )
         return result(
             Decision.BUY,
             "local_adjustment_and_stabilization",
