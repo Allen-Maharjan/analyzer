@@ -70,21 +70,10 @@ def test_breakdown_whose_fall_has_paused_no_longer_forces_wait():
     assert any("broke below" in risk for risk in result.downside_risks)
 
 
-def test_slide_over_several_weeks_counts_as_a_drop_for_gold():
-    slide = lag(nepal_change_3_publications=700, nepal_change_3_publications_pct=0.003,
-                recent_high=292000, drawdown_from_high_pct=-0.06)
-    result = decide(inputs(lag=slide, h4_stabilized=True))
-    assert result.decision is Decision.BUY
-    assert any("below its high" in r.plain for r in result.reasons)
-
-
-def test_small_slide_or_silver_does_not_use_the_drop_from_high():
-    from gold_advisor.assets import ASSETS
-
-    small = lag(nepal_change_3_publications=700, nepal_change_3_publications_pct=0.003, recent_high=285000, drawdown_from_high_pct=-0.03)
-    assert decide(inputs(lag=small, h4_stabilized=True)).decision is Decision.WATCH_CLOSELY
-    big = lag(nepal_change_3_publications=25, nepal_change_3_publications_pct=0.007, recent_high=4440, drawdown_from_high_pct=-0.17)
-    assert decide(inputs(lag=big, h4_stabilized=True, asset=ASSETS["silver"])).decision is Decision.WATCH_CLOSELY
+def test_buy_no_longer_needs_nepal_to_have_dropped():
+    unchanged = lag(nepal_change_3_publications=700, nepal_change_3_publications_pct=0.003)
+    assert decide(inputs(lag=unchanged, h4_stabilized=True)).decision is Decision.BUY
+    assert decide(inputs(lag=unchanged, h4_stabilized=False)).decision is Decision.WATCH_CLOSELY
 
 
 def test_buy_turns_into_wait_when_tomorrow_is_expected_cheaper():

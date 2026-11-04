@@ -5,11 +5,11 @@ Rules apply in strict precedence (first match wins):
 2. WAIT when a major event is within 24 h, world gold fell more than 2% since Nepal's last
    publication, or a confirmed breakdown still has strong downside momentum and the 4-hour
    chart has not paused (a breakdown whose fall has paused no longer forces WAIT).
-3. BUY when Nepal has come down (at least Rs 3,000/tola or 1% across the latest three
-   publications, or, where the asset enables it, at least 5% below its highest of the last 20
-   publications), the expected Nepal adjustment has cleared, and two completed 4-hour candles
-   show no new selloff low with improving RSI or MACD. If all that holds but Nepal's next price is
-   expected at least 0.5% lower (the next-price forecast), WAIT for it instead.
+3. BUY when the expected Nepal adjustment has cleared and two completed 4-hour candles show no
+   new selloff low with improving RSI or MACD. If that holds but Nepal's next price is expected at
+   least 0.5% lower (the next-price forecast), WAIT for it instead. BUY no longer needs Nepal's
+   price to have dropped first (rules-4): a two-year replay found that requirement made the advice
+   wait too long and pay about 0.5% more than buying at once.
 4. WATCH CLOSELY otherwise.
 
 Every result carries plain text for a non-trader and separate technical detail.
@@ -21,11 +21,9 @@ from gold_advisor.assets import AssetDefinition, GOLD
 from gold_advisor.decision.nepal import NepalLag
 from gold_advisor.domain import Confidence, Decision, Outlook
 
-VERSION = "rules-3"
+VERSION = "rules-4"
 WAIT_EVENT_HOURS = 24
 WAIT_INTL_DECLINE = -0.02
-BUY_DROP_RUPEES = -3000
-BUY_DROP_PCT = -0.01
 REVIEW_AFTER_DAYS = 7
 
 
@@ -126,23 +124,6 @@ def _nepal_reason(lag: NepalLag, asset: AssetDefinition) -> Reason | None:
     else:
         plain = f"Nepal's {asset.label.lower()} price is unchanged over the last three price updates."
     return Reason(plain, f"Latest {lag.latest.rate_date}: {rupees(lag.latest.nepal_price)}; change {pct(lag.nepal_change_3_publications_pct or 0)}.")
-
-
-def _dropped(lag: NepalLag, asset: AssetDefinition) -> tuple[bool, Reason | None]:
-    """Has Nepal's price come down enough to consider buying? Returns the answer and, when the
-    longer slide is what counts, a reason saying so."""
-    if lag.nepal_change_3_publications is not None and (
-        (asset.buy_drop_rupees is not None and lag.nepal_change_3_publications <= asset.buy_drop_rupees)
-        or (lag.nepal_change_3_publications_pct or 0) <= asset.buy_drop_pct
-    ):
-        return True, None
-    if asset.buy_drawdown_pct is not None and lag.drawdown_from_high_pct is not None and lag.drawdown_from_high_pct <= asset.buy_drawdown_pct:
-        return True, Reason(
-            f"Nepal's {asset.label.lower()} price is {abs(lag.drawdown_from_high_pct) * 100:.0f}% below its high of the last few weeks "
-            f"({rupees(lag.recent_high or 0)} per tola).",
-            f"Latest vs highest of the last 20 publications: {pct(lag.drawdown_from_high_pct)}; threshold {pct(asset.buy_drawdown_pct)}.",
-        )
-    return False, None
 
 
 def _lag_reason(lag: NepalLag, inp: "DecisionInputs | None" = None) -> Reason | None:
@@ -283,8 +264,7 @@ def decide(inp: DecisionInputs) -> DecisionResult:
         downside.append(f"World {inp.asset.label.lower()} recently broke below an important price floor; the fall has paused but could resume.")
 
     # 3. Conditions to buy.
-    dropped, slide_reason = _dropped(lag, inp.asset)
-    if dropped and lag.adjustment_pending is False and inp.h4_stabilized:
+    if lag.adjustment_pending is False and inp.h4_stabilized:
         limit = inp.asset.buy_block_expected_drop_pct
         if limit is not None and inp.next_price_change_pct is not None and inp.next_price_change_pct <= limit and inp.next_price is not None:
             reasons.append(
@@ -302,14 +282,13 @@ def decide(inp: DecisionInputs) -> DecisionResult:
                 "After Nepal's next price update (usually around 11 am).",
                 "Nepal publishing the lower price, after which buying may make sense.",
             )
-        if slide_reason is not None:
-            reasons.append(slide_reason)
         reasons.append(Reason("World prices have stopped falling for now.", inp.h4_detail))
         return result(
             Decision.BUY,
             "local_adjustment_and_stabilization",
             "Good time to buy",
-            "Nepal's price has come down, has caught up with world prices, and the fall has paused.",
+            "Nepal's price has caught up with world prices, world prices aren't falling, and no big announcement is close. "
+            "There's no clear reason to wait.",
             "Before buying, check that today's price is still the one shown here.",
             "World prices starting to fall again, or Nepal raising its price.",
         )
@@ -323,5 +302,5 @@ def decide(inp: DecisionInputs) -> DecisionResult:
         "Keep watching",
         "There's no strong reason to buy or to wait right now. The app will tell you when that changes.",
         "At Nepal's next price update, or if world prices move more than 1%.",
-        "Nepal's price dropping and holding steady would point to buying; a big fall in world prices would point to waiting.",
+        "World prices holding steady and Nepal's price catching up with them would point to buying; a big fall in world prices would point to waiting.",
     )

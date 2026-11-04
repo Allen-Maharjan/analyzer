@@ -45,10 +45,10 @@ def test_silver_candles_keep_identity():
     assert rows and {r.instrument for r in rows} == {'XAG/USD'}
 
 
-@pytest.mark.parametrize('asset,expected', [(GOLD, Decision.BUY), (SILVER, Decision.WATCH_CLOSELY)])
-def test_fixed_rupee_trigger_only_applies_to_gold(asset, expected):
+@pytest.mark.parametrize('asset', [GOLD, SILVER])
+def test_buy_text_names_the_asset(asset):
     result = decide(inputs(asset=asset, lag=lag(nepal_change_3_publications=-3001, nepal_change_3_publications_pct=-0.005), h4_stabilized=True))
-    assert result.decision == expected
+    assert result.decision == Decision.BUY
     assert '{inp' not in str(result.as_dict())
     assert asset.label.lower() in str(result.as_dict()).lower()
 

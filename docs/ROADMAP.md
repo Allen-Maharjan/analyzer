@@ -39,4 +39,6 @@ Codex / Claude Code / Kiro CLI runner on the host, schema-validated output, ±5 
 
 Empirical analogue scenarios for 24 h / 3 d / 7 d, immutable forecast storage, maturity evaluation, calibration, Brier score, walk-forward backtests.
 
-Built 2026-11-04 (ported from Freqtrade's backtesting and lookahead-analysis ideas, no Freqtrade code): `gold-advisor backtest` replays the current rules day by day on point-in-time data and reruns sampled days on cut-off history to prove nothing from the future leaked in. Next from the same port: extra strategy signals, a LightGBM forecaster (evidence only, never the decision), and chart indicator overlays.
+Built 2026-11-04 (ported from Freqtrade's backtesting and lookahead-analysis ideas, no Freqtrade code): `gold-advisor backtest` replays the current rules day by day on point-in-time data and reruns sampled days on cut-off history to prove nothing from the future leaked in.
+
+Rules-4 (2026-11-04, owner-approved): BUY no longer needs Nepal's price to have dropped first. On the two-year replay this cut the cost of following the advice, against buying on the first day of each 7-day period, from +0.53% to +0.07% for gold and from +0.48% to −0.04% for silver. BUY now appears on about half of all days (gold 335 of 611 days, silver 262 of 611). The FOMC WAIT rule stays: prices fell 1.5% (gold) and 2.9% (silver) over the five price updates after it. Next from the same port: extra strategy signals, a LightGBM forecaster (evidence only, never the decision), and chart indicator overlays.
