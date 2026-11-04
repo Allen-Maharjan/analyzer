@@ -1,6 +1,7 @@
 """Operator commands: ``gold-advisor backfill`` and ``gold-advisor collect <job>``."""
 
 import argparse
+from datetime import date
 import json
 from dataclasses import asdict
 import logging
@@ -39,7 +40,35 @@ def main(argv: list[str] | None = None) -> int:
     recorded = sub.add_parser("evaluate-decisions", help="evaluate saved decisions against immediate purchase")
     recorded.add_argument("--asset", choices=list(ASSETS), required=True)
     recorded.add_argument("--days", type=int, choices=range(1, 366), default=365, metavar="1..365")
+    replay = sub.add_parser("backtest", help="replay the BUY/WAIT rules over past Nepal publication days")
+    replay.add_argument("--asset", choices=list(ASSETS), required=True)
+    replay.add_argument("--start", type=date.fromisoformat, default=None, help="YYYY-MM-DD")
+    replay.add_argument("--end", type=date.fromisoformat, default=None, help="YYYY-MM-DD")
+    replay.add_argument("--lookahead-sample", type=int, default=30, help="days rerun on cut-off history (0 to skip)")
+    replay.add_argument("--csv", default=None, help="write one row per day to this file")
     args = parser.parse_args(argv)
+
+    if args.command == "backtest":
+        import csv
+        from gold_advisor import backtest
+        from gold_advisor.persistence.db import session_scope
+
+        asset = ASSETS[args.asset]
+        with session_scope() as session:
+            history = backtest.load(session, asset)
+        days = backtest.run(history, asset, args.start or date.min, args.end or date.max)
+        report = backtest.summarise(days)
+        if args.lookahead_sample > 0:
+            mismatches = backtest.lookahead_check(history, asset, days, args.lookahead_sample)
+            report["lookahead_check"] = {"sampled": min(args.lookahead_sample, len(days)), "mismatches": mismatches}
+        if args.csv:
+            with open(args.csv, "w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["day", "nepal_price", "decision", "rule", "next_price_change_pct"])
+                for d in days:
+                    writer.writerow([d.day, d.nepal_price, d.decision.value, d.rule, d.next_price_change_pct])
+        print(json.dumps({"asset": asset.id, **report}, default=str, indent=2))
+        return 1 if report.get("lookahead_check", {}).get("mismatches") else 0
 
     if args.command == "evaluate-decisions":
         from datetime import datetime, timedelta

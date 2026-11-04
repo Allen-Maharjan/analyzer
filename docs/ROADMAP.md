@@ -38,3 +38,5 @@ Codex / Claude Code / Kiro CLI runner on the host, schema-validated output, ±5 
 ## Phase 5: forecasts and evaluation
 
 Empirical analogue scenarios for 24 h / 3 d / 7 d, immutable forecast storage, maturity evaluation, calibration, Brier score, walk-forward backtests.
+
+Built 2026-11-04 (ported from Freqtrade's backtesting and lookahead-analysis ideas, no Freqtrade code): `gold-advisor backtest` replays the current rules day by day on point-in-time data and reruns sampled days on cut-off history to prove nothing from the future leaked in. Next from the same port: extra strategy signals, a LightGBM forecaster (evidence only, never the decision), and chart indicator overlays.

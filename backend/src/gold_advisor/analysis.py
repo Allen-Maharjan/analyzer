@@ -120,7 +120,7 @@ def _essential_issues(datasets: dict[str, health.DatasetHealth], price_source: s
     return issues
 
 
-def _h4_stabilization(ind: pd.DataFrame) -> tuple[bool | None, str]:
+def h4_stabilization(ind: pd.DataFrame) -> tuple[bool | None, str]:
     if len(ind) < SELLOFF_LOOKBACK_H4 + 3:
         return None, "not enough 4h bars"
     last2 = ind.iloc[-2:]
@@ -137,6 +137,44 @@ def _h4_stabilization(ind: pd.DataFrame) -> tuple[bool | None, str]:
         f"MACD histogram {'rising' if macd_up else 'not rising'}."
     )
     return ok, detail
+
+
+def timeframe_state(df: pd.DataFrame, tf: Timeframe, now: datetime, price_now: float | None,
+                    watch_levels: list[float]) -> tuple[pd.DataFrame, dict[str, score.Component], list[dict], dict]:
+    """Indicators, score components, level states and display detail for one timeframe."""
+    ind = indicators.compute(df, tf)
+    latest = indicators.latest_values(ind)
+    recent = df.tail(levels.LOOKBACK_BARS)
+    pivots = [p for p in levels.find_pivots(recent, tf) if p.available_at <= now]
+    close = float(df["close"].iloc[-1])
+    lvls = levels.cluster_levels(pivots, latest.get("atr_14") or 0, close, tf)
+    if tf in WATCH_LEVEL_TIMEFRAMES:
+        lvls += [levels.manual_level(p, close, tf) for p in watch_levels]
+    states = levels.as_dicts(levels.level_state(lvl, ind, price_now) for lvl in lvls)
+    swing = levels.swing_structure(pivots, now)
+    components = {
+        "trend": score.trend(ind),
+        "momentum": score.momentum(ind),
+        "structure": score.structure(swing, [s for s in states if s["state"] != "none"]),
+    }
+    detail = {
+        "last_bar_start": df.index[-1],
+        "indicators": latest,
+        "levels": levels.as_dicts(lvls),
+        "level_states": [s for s in states if s["state"] != "none"],
+        "swing_structure": swing,
+        "components": {k: asdict(v) for k, v in components.items()},
+    }
+    return ind, components, states, detail
+
+
+def strong_breakdown(per_tf: dict[Timeframe, dict[str, score.Component]], all_states: dict[Timeframe, list[dict]]) -> str | None:
+    for tf in (Timeframe.D1, Timeframe.H4):
+        mom = per_tf.get(tf, {}).get("momentum")
+        for s in all_states.get(tf, []):
+            if s["state"] in ("confirmed_break", "retest") and s["direction"] == "down" and mom and mom.value is not None and mom.value <= STRONG_DOWN_MOMENTUM:
+                return f"{tf.value} close broke below {s['price']:.2f} ({s['level_id']}); {tf.value} momentum {mom.value:+.0f}."
+    return None
 
 
 def _macro_series(session: Session, series_id: str) -> pd.Series | None:
@@ -168,31 +206,8 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
     for tf, df in bars.items():
         if df.empty:
             continue
-        ind = indicators.compute(df, tf)
+        ind, per_tf[tf], all_states[tf], tf_detail[tf.value] = timeframe_state(df, tf, now, price_now, watch_levels)
         ind_by_tf[tf] = ind
-        latest = indicators.latest_values(ind)
-        recent = df.tail(levels.LOOKBACK_BARS)
-        pivots = [p for p in levels.find_pivots(recent, tf) if p.available_at <= now]
-        close = float(df["close"].iloc[-1])
-        lvls = levels.cluster_levels(pivots, latest.get("atr_14") or 0, close, tf)
-        if tf in WATCH_LEVEL_TIMEFRAMES:
-            lvls += [levels.manual_level(p, close, tf) for p in watch_levels]
-        states = levels.as_dicts(levels.level_state(lvl, ind, price_now) for lvl in lvls)
-        all_states[tf] = states
-        swing = levels.swing_structure(pivots, now)
-        per_tf[tf] = {
-            "trend": score.trend(ind),
-            "momentum": score.momentum(ind),
-            "structure": score.structure(swing, [s for s in states if s["state"] != "none"]),
-        }
-        tf_detail[tf.value] = {
-            "last_bar_start": df.index[-1],
-            "indicators": latest,
-            "levels": levels.as_dicts(lvls),
-            "level_states": [s for s in states if s["state"] != "none"],
-            "swing_structure": swing,
-            "components": {k: asdict(v) for k, v in per_tf[tf].items()},
-        }
 
     components = score.aggregate_technical(per_tf)
     components["macro"] = score.macro(_macro_series(session, "DFII10"), _macro_series(session, "DGS2"), None)
@@ -217,17 +232,9 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
     components["event_risk"] = score.event_risk(score.base_direction(components), hours_to_event)
     deterministic, coverage = score.combine(components)
 
-    strong_breakdown = None
-    for tf in (Timeframe.D1, Timeframe.H4):
-        mom = per_tf.get(tf, {}).get("momentum")
-        for s in all_states.get(tf, []):
-            if s["state"] in ("confirmed_break", "retest") and s["direction"] == "down" and mom and mom.value is not None and mom.value <= STRONG_DOWN_MOMENTUM:
-                strong_breakdown = f"{tf.value} close broke below {s['price']:.2f} ({s['level_id']}); {tf.value} momentum {mom.value:+.0f}."
-                break
-        if strong_breakdown:
-            break
+    strong = strong_breakdown(per_tf, all_states)
 
-    h4_ok, h4_detail = _h4_stabilization(ind_by_tf[Timeframe.H4]) if Timeframe.H4 in ind_by_tf else (None, "no 4h bars")
+    h4_ok, h4_detail = h4_stabilization(ind_by_tf[Timeframe.H4]) if Timeframe.H4 in ind_by_tf else (None, "no 4h bars")
 
     pub_rows = session.scalars(
         select(LocalMetalRateRow)
@@ -283,7 +290,7 @@ def build(session: Session, now: datetime | None = None, asset: AssetDefinition 
             lag=lag,
             hours_to_next_major_event=hours_to_event,
             next_event_title=next_event.title if next_event else None,
-            strong_breakdown=strong_breakdown,
+            strong_breakdown=strong,
             h4_stabilized=h4_ok,
             h4_detail=h4_detail,
             score=deterministic,

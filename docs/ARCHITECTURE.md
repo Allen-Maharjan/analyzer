@@ -85,6 +85,7 @@ The dashboard (`web/`) reads data **through the FastAPI service** (`GA_API_URL`)
 | `backend/src/gold_advisor/analysis.py` | Builds one immutable snapshot per asset |
 | `backend/src/gold_advisor/analytics/` | Indicators (TA-Lib), levels, score, technical signals, scenario forecasts |
 | `backend/src/gold_advisor/decision/` | Nepal lag/premium and BUY / WAIT / WATCH CLOSELY rules |
+| `backend/src/gold_advisor/backtest.py` | Replays the rules over past Nepal publication days with point-in-time data, plus a look-ahead check. Run `gold-advisor backtest --asset gold` (read-only) |
 | `backend/src/gold_advisor/ai/` | AI input facts, output schema, validation (`contract.py`) and job queue (`service.py`) |
 | `backend/src/gold_advisor/assets.py` | Asset definitions (gold, silver): sources, units, thresholds |
 | `backend/src/gold_advisor/freshness.py`, `health.py` | Freshness rules and source health |
