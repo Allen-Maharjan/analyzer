@@ -116,6 +116,8 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
   let snapshot: Snapshot | null = null;
   let candles: CandleSeries | null = null;
   const ai = await backend<AiOverview>(withAsset("/api/v1/ai", asset)).catch(() => null);
+  // The chart is live, so it shows the watch levels saved now, not those of the last analysis run.
+  const savedWatch = await backend<{ levels: number[] }>(withAsset("/api/v1/settings/watch-levels", asset)).catch(() => null);
   try {
     const snapshotId = id && /^[0-9a-f-]{36}$/.test(id) ? id : (await backendOrNull<Dashboard>(withAsset("/api/v1/dashboard", asset)))?.snapshot_id;
     if (snapshotId) {
@@ -146,7 +148,9 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
   const close = s.prices.world_usd_now ?? 0;
   // For each chart timeframe: the two nearest support levels below the price and the two nearest
   // resistance levels above it, from that timeframe's own analysis, plus the owner's watch levels.
-  const watchLevels: ChartLevel[] = (daily?.levels ?? []).filter((l) => l.manual).map((l) => ({ ...l, kind: "watch" }));
+  const watchLevels: ChartLevel[] = savedWatch
+    ? savedWatch.levels.map((price) => ({ id: `watch-${Math.round(price)}`, price, kind: "watch", manual: true }))
+    : (daily?.levels ?? []).filter((l) => l.manual).map((l) => ({ ...l, kind: "watch" }));
   const chartLevels = Object.fromEntries(
     (["15m", "1h", "1D"] as const).map((tf) => {
       const found = (s.timeframes[tf]?.levels ?? []).filter((l) => !l.manual);
