@@ -11,7 +11,8 @@ export function marketPath(resource: string, params: URLSearchParams): MarketPat
     const timeframe = params.get("timeframe") ?? "15m";
     if (!TIMEFRAMES.has(timeframe)) return { status: 400, message: "Invalid timeframe." };
     query.set("timeframe", timeframe);
-    query.set("limit", "192"); // indicators cover exactly the bars the chart shows
+    // The full-screen chart asks for more history to scroll back through; indicators cover exactly the bars shown.
+    query.set("limit", params.get("bars") === "long" ? "600" : "192");
     return { path: `/api/v1/${resource}?${query}` };
   }
   if (resource === "quote") return { path: `/api/v1/quotes/latest?${query}` };

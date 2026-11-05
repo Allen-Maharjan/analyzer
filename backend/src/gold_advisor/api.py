@@ -12,10 +12,10 @@ if _SRC not in sys.path:
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -713,6 +713,48 @@ def put_watch_levels(session: SessionDep, asset: AssetDep, body: WatchLevelsIn) 
     row.updated_at = datetime.now(UTC)
     session.add(row)
     return WatchLevelsIn(levels=row.value["value"])
+
+
+# Lines the owner draws on the full-screen chart. Anchored by time and price, so one set shows on
+# every timeframe. Stored per asset in app_settings; they never feed the analysis.
+DRAWING_POINTS = {"trend": 2, "horizontal": 1, "rectangle": 2, "fib": 2}
+
+
+class DrawingPoint(BaseModel):
+    time: Annotated[int, Field(ge=946684800, le=4102444800)]  # Unix seconds, 2000 to 2100
+    price: Annotated[float, Field(gt=0, lt=1_000_000)]
+
+
+class Drawing(BaseModel):
+    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{1,40}$")]
+    kind: Literal["trend", "horizontal", "rectangle", "fib"]
+    points: list[DrawingPoint] = Field(min_length=1, max_length=2)
+
+    @model_validator(mode="after")
+    def _point_count(self) -> "Drawing":
+        if len(self.points) != DRAWING_POINTS[self.kind]:
+            raise ValueError(f"a {self.kind} drawing needs {DRAWING_POINTS[self.kind]} point(s)")
+        return self
+
+
+class DrawingsIn(BaseModel):
+    drawings: list[Drawing] = Field(max_length=100)
+
+
+@app.get("/api/v1/settings/drawings", response_model=DrawingsIn)
+def get_drawings(session: SessionDep, asset: AssetDep) -> DrawingsIn:
+    row = session.get(AppSettingRow, f"drawings:{asset.id}")
+    return DrawingsIn(drawings=row.value.get("value", []) if row else [])
+
+
+@app.put("/api/v1/settings/drawings", response_model=DrawingsIn)
+def put_drawings(session: SessionDep, asset: AssetDep, body: DrawingsIn) -> DrawingsIn:
+    key = f"drawings:{asset.id}"
+    row = session.get(AppSettingRow, key) or AppSettingRow(key=key, value={})
+    row.value = {"value": [d.model_dump() for d in body.drawings]}
+    row.updated_at = datetime.now(UTC)
+    session.add(row)
+    return body
 
 
 # --- AI analysis -----------------------------------------------------------------------

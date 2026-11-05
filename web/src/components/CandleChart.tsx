@@ -9,10 +9,15 @@ import {
   createChart,
   type IChartApi,
   type ISeriesApi,
+  type MouseEventParams,
+  type IRange,
   type SeriesType,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
+
+import { DrawingLayer, POINTS_NEEDED, TimeAxis, newDrawingId, type Drawing, type DrawingPoint, type Tool } from "@/components/chartDrawings";
 
 type Candle = { bucket_start: string; open: number; high: number; low: number; close: number };
 /** A horizontal level: support below the price, resistance above, or the owner's watch level. */
@@ -119,6 +124,16 @@ const OVERLAY_LINES: Record<OverlayId, Line[]> = {
 
 const time = (iso: string) => (Date.parse(iso) / 1000) as UTCTimestamp;
 
+/** Drawing controls for the full-screen chart. Without them the chart is fixed and read-only. */
+export type ChartEditor = {
+  tool: Tool;
+  selectedId: string | null;
+  onAdd: (drawing: Drawing) => void;
+  onSelect: (id: string | null) => void;
+};
+
+const NO_DRAWINGS: Drawing[] = [];
+
 export function CandleChart({
   candles,
   levels,
@@ -127,6 +142,9 @@ export function CandleChart({
   indicators = [],
   overlays = [],
   panels = [],
+  drawings = NO_DRAWINGS,
+  editor,
+  fill = false,
 }: {
   candles: Candle[];
   levels: ChartLevel[];
@@ -135,18 +153,35 @@ export function CandleChart({
   indicators?: IndicatorPoint[];
   overlays?: OverlayId[];
   panels?: PanelId[];
+  drawings?: Drawing[];
+  editor?: ChartEditor;
+  /** Fill the parent's height instead of using the fixed height. */
+  fill?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const legendRef = useRef<HTMLDivElement>(null);
   const shownPanels = indicators.length ? panels : [];
   const shownOverlays = indicators.length ? overlays : [];
+  const interactive = editor != null;
+  const chartRef = useRef<IChartApi | null>(null);
+  const layerRef = useRef<DrawingLayer | null>(null);
+  // Latest values for event handlers, so a new tool or drawing doesn't rebuild the chart.
+  const editorRef = useRef(editor);
+  const drawingsRef = useRef(drawings);
+  useEffect(() => {
+    editorRef.current = editor;
+    drawingsRef.current = drawings;
+  });
+  // Keep the zoom and scroll position when fresh bars arrive each minute.
+  const viewRef = useRef<{ timeframe: string; range: IRange<Time> } | null>(null);
+  const cancelDrawRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const el = ref.current;
     const legendEl = legendRef.current;
     if (!el || candles.length === 0) return;
     const chart: IChartApi = createChart(el, {
-      height: MAIN_HEIGHT + shownPanels.length * PANEL_HEIGHT,
+      ...(fill ? { autoSize: true } : { height: MAIN_HEIGHT + shownPanels.length * PANEL_HEIGHT }),
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: "#5f5f67",
@@ -157,10 +192,11 @@ export function CandleChart({
       grid: { vertLines: { visible: false }, horzLines: { color: GRID } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: timeframe !== "1D" },
-      crosshair: { horzLine: { visible: false } },
-      handleScroll: false,
-      handleScale: false,
+      crosshair: { horzLine: { visible: interactive } },
+      handleScroll: interactive,
+      handleScale: interactive,
     });
+    chartRef.current = chart;
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: BUY,
@@ -173,6 +209,11 @@ export function CandleChart({
     candleSeries.setData(
       candles.map((c) => ({ time: time(c.bucket_start), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) })),
     );
+    const axis = new TimeAxis(chart, candles.map((c) => time(c.bucket_start)));
+    const layer = new DrawingLayer(axis);
+    layer.set(drawingsRef.current, editorRef.current?.selectedId ?? null, null);
+    candleSeries.attachPrimitive(layer);
+    layerRef.current = layer;
     // Support (green) and resistance (red) as dashed lines labelled on the price axis; the
     // owner's watch level as a solid ochre line. Toggled with the "Support & resistance" chip.
     const LEVEL_STYLE = {
@@ -296,30 +337,140 @@ export function CandleChart({
       renderLegends(values);
     });
 
-    chart.timeScale().fitContent();
+    const saved = viewRef.current;
+    if (interactive && saved && saved.timeframe === timeframe) chart.timeScale().setVisibleRange(saved.range);
+    else chart.timeScale().fitContent();
     const resize = new ResizeObserver(() => {
-      chart.applyOptions({ width: el.clientWidth });
+      if (!fill) chart.applyOptions({ width: el.clientWidth });
       placeLegends();
     });
     resize.observe(el);
+
+    // Drawing: drag from start to end, or tap the start and then the end. A horizontal line takes one tap.
+    let start: DrawingPoint | null = null;
+    let phase: "idle" | "dragging" | "awaiting" = "idle";
+    let downAt = { x: 0, y: 0 };
+    const local = (e: PointerEvent) => {
+      const box = el.getBoundingClientRect();
+      return { x: e.clientX - box.left, y: e.clientY - box.top };
+    };
+    const inPricePane = (p: { x: number; y: number }) => {
+      const size = chart.paneSize(0);
+      return p.x >= 0 && p.x <= size.width && p.y >= 0 && p.y <= size.height;
+    };
+    const pointAt = (p: { x: number; y: number }): DrawingPoint | null => {
+      const t = axis.time(p.x);
+      const v = candleSeries.coordinateToPrice(p.y);
+      return t == null || v == null || v <= 0 ? null : { time: t, price: Math.round(v * 100) / 100 };
+    };
+    const kind = () => {
+      const tool = editorRef.current?.tool;
+      return tool && tool !== "select" ? tool : null;
+    };
+    const finish = (end: DrawingPoint) => {
+      const k = kind();
+      if (k && start) editorRef.current?.onAdd({ id: newDrawingId(), kind: k, points: [start, end] });
+      cancel();
+    };
+    const cancel = () => {
+      start = null;
+      phase = "idle";
+      layer.setPreview(null);
+    };
+    cancelDrawRef.current = cancel;
+    const onDown = (e: PointerEvent) => {
+      const k = kind();
+      const p = local(e);
+      if (!k || !inPricePane(p)) return;
+      const point = pointAt(p);
+      if (!point) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (POINTS_NEEDED[k] === 1) {
+        editorRef.current?.onAdd({ id: newDrawingId(), kind: k, points: [point] });
+        return;
+      }
+      if (phase === "awaiting" && start) return finish(point);
+      el.setPointerCapture(e.pointerId);
+      start = point;
+      downAt = p;
+      phase = "dragging";
+      layer.setPreview({ id: "preview", kind: k, points: [point, point] });
+    };
+    const onMove = (e: PointerEvent) => {
+      const k = kind();
+      if (!k || !start || phase === "idle") return;
+      const point = pointAt(local(e));
+      if (point) layer.setPreview({ id: "preview", kind: k, points: [start, point] });
+    };
+    const onUp = (e: PointerEvent) => {
+      if (phase !== "dragging" || !start) return;
+      const p = local(e);
+      if (Math.hypot(p.x - downAt.x, p.y - downAt.y) < 6) {
+        phase = "awaiting"; // a tap: wait for the end point
+        return;
+      }
+      const point = pointAt(p);
+      if (point) finish(point);
+      else cancel();
+    };
+    // In move mode, a tap selects the nearest drawing, or clears the selection.
+    const onClick = (param: MouseEventParams<Time>) => {
+      const ed = editorRef.current;
+      if (!ed || ed.tool !== "select" || !param.point) return;
+      ed.onSelect(layer.hit(param.point, chart.paneSize(0).width, window.matchMedia("(pointer: coarse)").matches ? 14 : 8));
+    };
+    if (interactive) {
+      el.addEventListener("pointerdown", onDown, true);
+      el.addEventListener("pointermove", onMove);
+      el.addEventListener("pointerup", onUp);
+      el.addEventListener("pointercancel", cancel);
+      chart.subscribeClick(onClick);
+    }
+
     return () => {
       cancelAnimationFrame(frame);
       resize.disconnect();
+      if (interactive) {
+        el.removeEventListener("pointerdown", onDown, true);
+        el.removeEventListener("pointermove", onMove);
+        el.removeEventListener("pointerup", onUp);
+        el.removeEventListener("pointercancel", cancel);
+        const range = chart.timeScale().getVisibleRange();
+        viewRef.current = range ? { timeframe, range } : null;
+      }
+      cancelDrawRef.current = () => {};
+      chartRef.current = null;
+      layerRef.current = null;
       chart.remove();
       legendEl?.replaceChildren();
     };
     // shownPanels/shownOverlays are derived from props; join them so the effect reruns on real changes only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join(), overlays.includes("levels")]);
+  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join(), overlays.includes("levels"), interactive, fill]);
+
+  // New or removed drawings and selection: redraw without rebuilding the chart.
+  useEffect(() => {
+    layerRef.current?.set(drawings, editor?.selectedId ?? null);
+  }, [drawings, editor?.selectedId]);
+
+  // Moving and zooming only in move mode; while drawing, a drag draws instead. Switching tools drops a half-drawn line.
+  const tool = editor?.tool ?? "select";
+  useEffect(() => {
+    cancelDrawRef.current();
+    if (!interactive) return;
+    chartRef.current?.applyOptions({ handleScroll: tool === "select", handleScale: tool === "select" });
+  }, [tool, interactive]);
 
   const described = [...shownOverlays.map((o) => OVERLAYS.find((x) => x.id === o)?.label), ...shownPanels.map((p) => PANEL_SPECS[p].title)].filter(Boolean);
   return (
-    <div className="relative">
+    <div className={fill ? "relative h-full" : "relative"}>
       <div
         ref={ref}
-        className="w-full"
+        className={fill ? "h-full w-full" : "w-full"}
+        style={interactive && tool !== "select" ? { touchAction: "none", cursor: "crosshair" } : undefined}
         role="img"
-        aria-label={`World ${label} ${timeframe} price candles with support and resistance levels${described.length ? `, plus ${described.join(", ")}` : ""}`}
+        aria-label={`World ${label} ${timeframe} price candles with support and resistance levels${described.length ? `, plus ${described.join(", ")}` : ""}${drawings.length ? `, and ${drawings.length} line${drawings.length === 1 ? "" : "s"} you drew` : ""}`}
       />
       <div ref={legendRef} aria-hidden className="pointer-events-none absolute inset-0" />
     </div>
