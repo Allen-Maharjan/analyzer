@@ -137,6 +137,7 @@ The dashboard (`web/`) reads data **through the FastAPI service** (`GA_API_URL`)
 | `backend/src/gold_advisor/quotes.py` | Cross-check of the two world-price sources |
 | `backend/src/gold_advisor/live.py` | The live world price and next-Nepal-price estimate for `/api/v1/live` |
 | `backend/src/gold_advisor/analytics/track_record.py` | Past forecasts and advice against published prices (Track record page) |
+| `backend/src/gold_advisor/analytics/ml_forecast.py` | LightGBM up/down forecaster, `gold-advisor ml-forecast` only (optional `backend[ml]` extra). Experiment: tested with no edge, not used by the app |
 | `backend/src/gold_advisor/analytics/position.py`, `announcements.py` | "Where the price is", rupee floors and ceilings, upcoming US announcements |
 | `backend/src/gold_advisor/decision/split.py` | Two-part buying (built, switched off) |
 | `backend/src/gold_advisor/trading.py` | Silver Trade screen: plan states, the owner's trade book, the replay |

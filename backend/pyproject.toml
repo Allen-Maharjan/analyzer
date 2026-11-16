@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9", "respx>=0.21,<1"]
+ml = ["lightgbm>=4.5,<5"]  # gold-advisor ml-forecast only; never needed by the API or the cycle
 
 [project.scripts]
 gold-advisor = "gold_advisor.cli:main"

@@ -49,7 +49,24 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument("--compare-split", action="store_true", help="compare one purchase with buying in two parts")
     replay.add_argument("--trade", action="store_true", help="replay the silver trade rule at 0%%, 2%% and 4%% buy-back gaps")
     replay.add_argument("--store-trade", action="store_true", help="with --trade: save the result for the Trade screen (writes app_settings)")
+    ml = sub.add_parser("ml-forecast", help="walk-forward test of the LightGBM direction forecaster (read-only)")
+    ml.add_argument("--asset", choices=list(ASSETS), required=True)
     args = parser.parse_args(argv)
+
+    if args.command == "ml-forecast":
+        try:
+            import lightgbm  # noqa: F401
+        except ImportError:
+            print("LightGBM is not installed: pip install -e 'backend[ml]'", file=sys.stderr)
+            return 1
+        from gold_advisor.analytics import ml_forecast
+        from gold_advisor.persistence.db import session_scope
+
+        asset = ASSETS[args.asset]
+        with session_scope() as session:  # reads only
+            bars, other, macro = ml_forecast.load_inputs(session, asset)
+        print(json.dumps(ml_forecast.report(asset.label, bars, other, macro), default=str, indent=2))
+        return 0
 
     if args.command == "backtest":
         import csv
