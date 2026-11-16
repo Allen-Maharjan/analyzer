@@ -51,7 +51,25 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument("--store-trade", action="store_true", help="with --trade: save the result for the Trade screen (writes app_settings)")
     ml = sub.add_parser("ml-forecast", help="walk-forward test of the LightGBM direction forecaster (read-only)")
     ml.add_argument("--asset", choices=list(ASSETS), required=True)
+    mf = sub.add_parser("macro-forecast", help="walk-forward test of 3- and 12-month forecasts on 2000+ history (fetches, never writes)")
+    mf.add_argument("--asset", choices=list(ASSETS), required=True)
+    sub.add_parser("trade-signals", help="test the entropy and Kalman silver trade ideas on 2000+ world history (fetches, never writes)")
     args = parser.parse_args(argv)
+
+    if args.command == "trade-signals":
+        from gold_advisor.analytics import macro_forecast, trade_signals
+
+        close = macro_forecast.fetch_history(ASSETS["silver"].candle_symbol)
+        print(json.dumps(trade_signals.report(close), default=str, indent=2))
+        return 0
+
+    if args.command == "macro-forecast":
+        from gold_advisor.analytics import macro_forecast
+
+        asset = ASSETS[args.asset]
+        close = macro_forecast.fetch_history(asset.candle_symbol)
+        print(json.dumps(macro_forecast.report(asset.label, close, macro_forecast.fetch_fred()), default=str, indent=2))
+        return 0
 
     if args.command == "ml-forecast":
         try:
