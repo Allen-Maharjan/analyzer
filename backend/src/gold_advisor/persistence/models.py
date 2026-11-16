@@ -186,6 +186,12 @@ class PurchasePlanRow(Base):
     waiting_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = _ingested()
+    # Two-part purchase (decision/split.py): set when the owner records the first half.
+    first_part_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_part_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    second_dip_npr: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    second_recovery_npr: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    second_deadline: Mapped[date | None] = mapped_column(Date)
 
 
 
@@ -272,3 +278,51 @@ class NewsRiskRow(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (Index("ix_news_risk_confirmations_asset_expires", "asset_id", "expires_at"),)
+
+
+class TradeRow(Base):
+    """What the owner says they bought or sold (silver Trade screen). Entered and corrected by hand."""
+
+    __tablename__ = "trades"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    asset_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    side: Mapped[str] = mapped_column(String(4), nullable=False)  # buy | sell
+    quantity_tola: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    price_npr: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    traded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    note: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    created_at: Mapped[datetime] = _ingested()
+    updated_at: Mapped[datetime] = _ingested()
+    __table_args__ = (
+        CheckConstraint("side IN ('buy', 'sell')", name="side_valid"),
+        CheckConstraint("quantity_tola > 0 AND price_npr > 0", name="amounts_positive"),
+        Index("ix_trades_asset_traded", "asset_id", "traded_at"),
+    )
+
+
+class PushSubscriptionRow(Base):
+    """One browser's Web Push subscription. Deleted when the push service answers 404 or 410."""
+
+    __tablename__ = "push_subscriptions"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    p256dh: Mapped[str] = mapped_column(Text, nullable=False)
+    auth: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _ingested()
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+
+
+class AlertEventRow(Base):
+    """An alert that fired. The unique key makes every event notify once, however often the cycle runs."""
+
+    __tablename__ = "alert_events"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    asset_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = _ingested()
+    sent: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")

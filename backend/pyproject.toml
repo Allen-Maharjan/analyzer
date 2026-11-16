@@ -18,6 +18,7 @@ dependencies = [
   "numpy>=1.26,<3",
   "pandas>=2.2,<3",
   "TA-Lib>=0.6,<0.7",
+  "pywebpush>=2.0,<3",
 ]
 
 [project.optional-dependencies]

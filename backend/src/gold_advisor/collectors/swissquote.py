@@ -57,5 +57,5 @@ def parse(payload: object, *, now: datetime, asset: AssetDefinition = GOLD) -> S
     )
 
 
-def fetch(client: httpx.Client, *, now: datetime, asset: AssetDefinition = GOLD) -> SpotQuote:
-    return parse(get_with_retries(client, f"https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/{asset.instrument}", attempts=2).json(), now=now, asset=asset)
+def fetch(client: httpx.Client, *, now: datetime, asset: AssetDefinition = GOLD, attempts: int = 2) -> SpotQuote:
+    return parse(get_with_retries(client, f"https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/{asset.instrument}", attempts=attempts).json(), now=now, asset=asset)

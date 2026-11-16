@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             {message}
           </p>
         )}
-        <button type="submit" className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-white hover:bg-accent-hover">
+        <button type="submit" className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-on-accent hover:bg-accent-hover">
           Sign in
         </button>
       </form>

@@ -43,5 +43,5 @@ def parse(payload: object, *, now: datetime, asset: AssetDefinition = GOLD) -> S
     )
 
 
-def fetch(client: httpx.Client, *, now: datetime, asset: AssetDefinition = GOLD) -> SpotQuote:
-    return parse(get_with_retries(client, f"https://api.gold-api.com/price/{asset.spot_symbol}").json(), now=now, asset=asset)
+def fetch(client: httpx.Client, *, now: datetime, asset: AssetDefinition = GOLD, attempts: int = 3) -> SpotQuote:
+    return parse(get_with_retries(client, f"https://api.gold-api.com/price/{asset.spot_symbol}", attempts=attempts).json(), now=now, asset=asset)

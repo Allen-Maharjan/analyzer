@@ -1,6 +1,6 @@
 import { forward } from "@/lib/backend";
 
-const ACTIONS = new Set(["purchased", "restart"]);
+const ACTIONS = new Set(["purchased", "restart", "first_part"]);
 
 export async function POST(request: Request, { params }: { params: Promise<{ action: string }> }) {
   const { action } = await params;

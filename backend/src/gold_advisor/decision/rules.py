@@ -1,7 +1,9 @@
 """BUY / WAIT / WATCH CLOSELY rules and their plain-language explanation.
 
 Rules apply in strict precedence (first match wins):
-1. WATCH CLOSELY when essential data is stale, missing, inconsistent, or insufficient.
+1. WATCH CLOSELY when essential data is stale, missing, inconsistent, or insufficient. A Nepal source
+   that answered recently but has published nothing new (a holiday) is not a data problem for up to
+   7 days; the rules below run and a limitation says so (rules-6).
 2. WAIT when a major event is within 24 h, world gold fell more than 2% since Nepal's last
    publication, or a confirmed breakdown still has strong downside momentum and the 4-hour
    chart has not paused (a breakdown whose fall has paused no longer forces WAIT).
@@ -13,16 +15,21 @@ Rules apply in strict precedence (first match wins):
    wait too long and pay about 0.5% more than buying at once.
 4. WATCH CLOSELY otherwise.
 
+A BUY in a falling world market could become "buy half now" with three triggers for the second half
+(decision/split.py). It is built but switched off: the two-year replay found one purchase cheaper
+for both metals (2026-11-16). Never more than two parts.
+
 Every result carries plain text for a non-trader and separate technical detail.
 """
 
 from dataclasses import asdict, dataclass, field
+from datetime import date
 
 from gold_advisor.assets import AssetDefinition, GOLD
 from gold_advisor.decision.nepal import NepalLag
 from gold_advisor.domain import Confidence, Decision, Outlook
 
-VERSION = "rules-5"
+VERSION = "rules-6"
 WAIT_EVENT_HOURS = 24
 WAIT_INTL_DECLINE = -0.02
 REVIEW_AFTER_DAYS = 7
@@ -52,6 +59,8 @@ class DecisionInputs:
     next_price_change_pct: float | None = None  # vs the latest published price
     next_release_title: str | None = None  # next US data release (CPI, jobs, PCE): a risk, not a WAIT trigger
     hours_to_next_release: float | None = None
+    # Date of Nepal's latest price when the source answered but has published nothing newer (rules-6).
+    nepal_quiet_since: date | None = None
 
 
 @dataclass
@@ -162,6 +171,12 @@ def decide(inp: DecisionInputs) -> DecisionResult:
         limitations.append("The US economic calendar is not available, so upcoming announcements may be missed.")
     if lag.publication_dates_only:
         limitations.append("Nepal's latest price has a date but no exact time; comparisons assume about 10:45 am.")
+    if inp.nepal_quiet_since is not None:
+        since = inp.nepal_quiet_since
+        limitations.append(
+            f"Nepal has not published a new price since {since.day} {since:%b}, possibly a holiday. "
+            "Shops may be closed or using the old price."
+        )
 
     upside = [f"{inp.asset.label} could rebound quickly after a fall, so waiting can also cost money."]
     downside = [f"World {inp.asset.label.lower()} could keep falling, and Nepal's price usually follows within a day or two."]

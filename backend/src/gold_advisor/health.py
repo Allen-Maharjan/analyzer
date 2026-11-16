@@ -131,13 +131,14 @@ def all_sources(session: Session, now: datetime, asset: AssetDefinition = GOLD) 
             LocalMetalRateRow.unit == MassUnit.TOLA.value,
         )
     )
+    nepal_collector = collector_health(session, "fenegosida.today")
     out.append(
         DatasetHealth(
             asset.local_dataset,
             Source.FENEGOSIDA,
             nepal_date,
-            freshness.nepal_publication(nepal_date, now),
-            collector_health(session, "fenegosida.today"),
+            freshness.nepal_publication(nepal_date, now, nepal_collector.last_success_at),
+            nepal_collector,
         )
     )
 

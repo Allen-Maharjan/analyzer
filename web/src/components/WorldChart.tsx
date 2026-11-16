@@ -351,7 +351,7 @@ export function WorldChart({ asset, label, initialCandles, levels }: {
           <div className="flex h-full flex-col gap-2 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <h2 className="text-base font-semibold capitalize">World {label} price</h2>
+                <h2 className="text-[1.2rem] font-bold capitalize">World {label} price</h2>
                 {spot}
               </div>
               <button

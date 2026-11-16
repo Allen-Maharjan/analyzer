@@ -1,5 +1,7 @@
 import { AppShell, ErrorState, Section } from "@/components/AppShell";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
+import { NotificationSettings } from "@/components/NotificationSettings";
+import { ThemeChoiceControl } from "@/components/ThemeChoice";
 import { WatchLevelsForm } from "@/components/WatchLevelsForm";
 import type { AiOverview } from "@/lib/ai";
 import { withAsset, type Asset } from "@/lib/asset";
@@ -42,6 +44,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             The AI reads the app's numbers and writes a short summary. Choose an installed AI tool or OpenRouter free models.
           </p>
           <AiSettingsForm settings={ai.settings} runner={ai.runner} />
+        </Section>
+        {process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && (
+          <Section title="Notifications">
+            <NotificationSettings asset={asset} />
+          </Section>
+        )}
+        <Section title="Appearance">
+          <p className="mb-3 text-sm leading-relaxed text-ink-2">Saved on this device.</p>
+          <ThemeChoiceControl />
         </Section>
         <Section title="Account">
           <form action="/api/logout" method="post">

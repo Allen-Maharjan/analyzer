@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from gold_advisor.assets import GOLD
-from gold_advisor.cycle import world_market_active
+from gold_advisor.cycle import nepal_saturday, world_market_active
 from gold_advisor.domain import UTC
 
 
@@ -22,3 +22,17 @@ from gold_advisor.domain import UTC
 def test_world_prices_collected_only_while_market_is_active(utc, active):
     now = datetime.fromisoformat(utc).replace(tzinfo=UTC)
     assert world_market_active(GOLD, now) is active
+
+
+@pytest.mark.parametrize(
+    ("utc", "saturday"),
+    [
+        ("2026-11-06T18:00", False),  # Friday 23:45 Nepal time
+        ("2026-11-06T18:15", True),   # Saturday 00:00 Nepal time
+        ("2026-11-07T12:00", True),   # Saturday afternoon in Nepal
+        ("2026-11-07T18:14", True),   # Saturday 23:59 Nepal time
+        ("2026-11-07T18:15", False),  # Sunday 00:00 Nepal time
+    ],
+)
+def test_saturday_is_judged_in_nepal_time(utc, saturday):
+    assert nepal_saturday(datetime.fromisoformat(utc).replace(tzinfo=UTC)) is saturday

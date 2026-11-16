@@ -9,12 +9,13 @@ _SRC = str(Path(__file__).resolve().parent.parent)
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
+from dataclasses import asdict
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Response, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Path, Query, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -48,7 +49,10 @@ from gold_advisor.persistence.models import (
 app = FastAPI(title="Nepal Gold Purchase Advisor API", version="0.1.0")
 
 OPEN_PATHS = ("/api/v1/health",)
-SELF_AUTHENTICATED_PREFIX = "/api/v1/runner/"  # checked against the runner token instead
+SELF_AUTHENTICATED_PREFIXES = (
+    "/api/v1/runner/",  # checked against the runner token instead
+    "/api/v1/cron/",  # checked against the cron token: the outside timer never holds the internal token
+)
 
 
 @app.middleware("http")
@@ -62,7 +66,7 @@ async def require_internal_token(request, call_next):
 
     token = _settings().internal_token
     path = request.url.path
-    if token and path not in OPEN_PATHS and not path.startswith(SELF_AUTHENTICATED_PREFIX):
+    if token and path not in OPEN_PATHS and not path.startswith(SELF_AUTHENTICATED_PREFIXES):
         given = request.headers.get("x-internal-token", "")
         if not hmac.compare_digest(given.encode(), token.encode()):
             return JSONResponse({"detail": "not authorised"}, status_code=401)
@@ -441,6 +445,61 @@ class RefreshTarget(StrEnum):
 
 
 REFRESH_COOLDOWN_SECONDS = 60
+# Start a cycle from the timer or on page open only when the newest advice is older than this,
+# and at most once per CYCLE_COOLDOWN_SECONDS (a cloud cycle takes 2-4 minutes).
+ADVICE_MAX_AGE_SECONDS = 20 * 60
+CYCLE_COOLDOWN_SECONDS = 600
+RECENT_START = "an update was started less than 10 minutes ago"
+
+
+def ensure_fresh(session: Session, now: datetime) -> tuple[bool, str]:
+    """Start a cycle when the newest advice is over 20 minutes old, none was started in the last
+    10 minutes, and it is not Saturday in Nepal. Returns (started, reason in plain words)."""
+    from sqlalchemy import func
+
+    from gold_advisor.cycle import nepal_saturday
+
+    newest = session.scalar(select(func.max(AnalysisSnapshotRow.created_at)))
+    if newest is not None and (now - newest).total_seconds() <= ADVICE_MAX_AGE_SECONDS:
+        return False, f"advice is {max(0, round((now - newest).total_seconds() / 60))} minutes old"
+    if nepal_saturday(now):
+        return False, "Saturday in Nepal: no new prices to collect"
+    if not cooldown_passed(session, "cycle", CYCLE_COOLDOWN_SECONDS):
+        return False, RECENT_START
+    if not dispatch_cycle(force_daily=False):
+        return False, "cloud updates are not configured"
+    return True, "update started"
+
+
+class TickOut(BaseModel):
+    started: bool
+    reason: str
+    # True when an update is running now: just started, or started by someone in the last 10 minutes.
+    updating: bool = False
+
+
+@app.post("/api/v1/cron/tick", response_model=TickOut)
+def cron_tick(session: SessionDep, authorization: Annotated[str | None, Header()] = None) -> TickOut:
+    """For the outside timer (cron-job.org, every 30 minutes). Bearer GA_CRON_TOKEN; 404 when unset."""
+    import hmac
+
+    from gold_advisor.config import get_settings as _settings
+
+    token = _settings().cron_token
+    if not token:
+        raise HTTPException(status_code=404, detail="Not Found")
+    given = (authorization or "").removeprefix("Bearer ").strip()
+    if not hmac.compare_digest(given.encode(), token.encode()):
+        raise HTTPException(status_code=401, detail="not authorised")
+    started, reason = ensure_fresh(session, datetime.now(UTC))
+    return TickOut(started=started, reason=reason, updating=started or reason == RECENT_START)
+
+
+@app.post("/api/v1/refresh/auto", response_model=TickOut)
+def refresh_auto(session: SessionDep) -> TickOut:
+    """Called once when the owner opens Today or Details, so old advice heals itself."""
+    started, reason = ensure_fresh(session, datetime.now(UTC))
+    return TickOut(started=started, reason=reason, updating=started or reason == RECENT_START)
 
 
 class RefreshOut(BaseModel):
@@ -544,6 +603,68 @@ class AssetOut(BaseModel):
     price_unit: str
     local_label: str | None
     timeframes: list[Timeframe]
+    tradable: bool = False
+
+
+class PositionOut(BaseModel):
+    nepal_price: float | None
+    nepal_low: float | None
+    nepal_low_date: date | None
+    nepal_high: float | None
+    nepal_high_date: date | None
+    nepal_window_start: date | None
+    nepal_publications: int
+    above_low_npr: float | None
+    below_high_npr: float | None
+    world_price: float | None
+    world_52w_low: float | None
+    world_52w_high: float | None
+    days_since_52w_low: int | None
+    plain: str | None
+
+
+class KeyLevelOut(BaseModel):
+    kind: Literal["floor", "ceiling"]
+    timeframe: str
+    world_price: float
+    rupees: float | None  # world_price x rupees_per_usd_oz, rounded
+    touches: int
+    manual: bool
+    state: str
+
+
+class SplitOut(BaseModel):
+    """Present when a BUY in a falling market becomes "buy half now"."""
+
+    reason: str
+    dip_npr: float | None
+    recovery_npr: float | None
+    deadline: date
+    deadline_reason: str
+    triggers: list[str]
+
+
+class SecondHalfOut(BaseModel):
+    first_part_at: datetime
+    first_part_price: float | None
+    dip_npr: float | None
+    recovery_npr: float | None
+    deadline: date | None
+    reached: str | None
+    plain: str
+
+
+class AnnouncementOut(BaseModel):
+    event_type: str
+    title: str
+    scheduled_at: datetime
+    importance: str
+    plain: str
+
+
+class AnnouncementsOut(BaseModel):
+    calendar_stale: bool
+    items: list[AnnouncementOut]
 
 
 class DashboardOut(BaseModel):
@@ -552,6 +673,8 @@ class DashboardOut(BaseModel):
     asset: AssetOut
     snapshot_id: str
     created_at: datetime
+    age_seconds: float  # now minus created_at, at request time
+    market_open: bool  # the world market, at request time
     decision: str
     headline: str
     summary: str
@@ -568,6 +691,13 @@ class DashboardOut(BaseModel):
     sources: list[SourceStatusOut]
     forecasts: list[ForecastSummaryOut]
     news_risk: "NewsRiskOverrideOut | None" = None
+    # Concrete answers (rules-7 snapshots onward; older snapshots give the defaults).
+    position: PositionOut | None = None
+    key_levels: list[KeyLevelOut] = []
+    rupees_per_usd_oz: float | None = None
+    split: SplitOut | None = None
+    second_half: SecondHalfOut | None = None
+    announcements: AnnouncementsOut | None = None
 
 
 class NewsRiskOverrideOut(BaseModel):
@@ -581,11 +711,62 @@ class NewsRiskOverrideOut(BaseModel):
     article_url: str | None
 
 
+class LiveOut(BaseModel):
+    """World price now. ``available`` is false when no source gave a recent price; then no numbers
+    are returned, so an older price is never shown as live."""
+
+    available: bool
+    market_open: bool
+    price: float | None = None
+    observed_at: datetime | None = None
+    age_seconds: float | None = None
+    source: Source | None = None
+    nepal_next: NepalNextOut | None = None
+
+
+@app.get("/api/v1/live", response_model=LiveOut)
+def live_price(session: SessionDep, asset: AssetDep) -> LiveOut:
+    """Never writes a snapshot or changes the decision. At most one upstream call per asset per 60 s."""
+    from gold_advisor import live
+
+    now = datetime.now(UTC)
+    market_open = asset.calendar.is_open(now)
+    row = live.latest(session, asset)
+    if live.needs_fetch(row.observed_at if row else None, now, asset):
+        with session_scope() as write:
+            allowed = cooldown_passed(write, f"live:{asset.id}", int(live.CACHE.total_seconds()))
+        if allowed and live.fetch(asset, now) is not None:
+            row = live.latest(session, asset)
+    if row is None or not live.is_live(row.observed_at, now, asset):
+        return LiveOut(available=False, market_open=market_open)
+    price = float(row.price)
+    nxt = live.estimate(session, asset, price, now)
+    return LiveOut(
+        available=True,
+        market_open=market_open,
+        price=price,
+        observed_at=row.observed_at,
+        age_seconds=round(max(0.0, (now - row.observed_at).total_seconds()), 1),
+        source=Source(row.source),
+        nepal_next=NepalNextOut(**asdict(nxt)) if nxt else None,
+    )
+
+
 def _latest_snapshot(session: Session, asset: AssetDefinition) -> AnalysisSnapshotRow:
     row = market_data.latest_snapshot(session, asset)
     if row is None:
         raise HTTPException(status_code=404, detail="no analysis has run yet")
     return row
+
+
+def _status_now(source: dict, now: datetime, asset: AssetDefinition) -> FreshnessStatus:
+    """A snapshot's stored source status is frozen at snapshot time; judge it again at ``now`` so an
+    old snapshot never says "up to date"."""
+    again = freshness.for_dataset(
+        source["dataset"], source.get("latest_observation"), now, asset.calendar,
+        (source.get("collector") or {}).get("last_success_at"),
+    )
+    return again.status if again is not None else FreshnessStatus(source["freshness"]["status"])
 
 
 @app.get("/api/v1/dashboard", response_model=DashboardOut)
@@ -613,6 +794,8 @@ def dashboard(session: SessionDep, asset: AssetDep) -> DashboardOut:
         asset=AssetOut(**asset.public()),
         snapshot_id=row.id,
         created_at=row.created_at,
+        age_seconds=round((now - row.created_at).total_seconds(), 1),
+        market_open=asset.calendar.is_open(now),
         decision=d["decision"],
         headline=d["headline"],
         summary=d["summary"],
@@ -650,11 +833,26 @@ def dashboard(session: SessionDep, asset: AssetDep) -> DashboardOut:
             for f in p.get("forecasts", [])
         ],
         sources=[
-            SourceStatusOut(dataset=s["dataset"], status=s["freshness"]["status"], latest=s["latest_observation"])
+            SourceStatusOut(dataset=s["dataset"], status=_status_now(s, now, asset), latest=s["latest_observation"])
             for s in p["sources"]
         ],
         news_risk=NewsRiskOverrideOut(**override) if override else None,
+        position=PositionOut(**p["position"]) if p.get("position") else None,
+        key_levels=[KeyLevelOut(**k) for k in p.get("key_levels") or []],
+        rupees_per_usd_oz=p.get("rupees_per_usd_oz"),
+        split=_split_out(p.get("split")) if d["decision"] == "BUY" else None,
+        second_half=SecondHalfOut(**p["second_half"]) if p.get("second_half") else None,
+        announcements=AnnouncementsOut(**p["announcements"]) if p.get("announcements") else None,
     )
+
+
+def _split_out(raw: dict | None) -> SplitOut | None:
+    from gold_advisor.decision import split
+
+    if not raw:
+        return None
+    deadline = date.fromisoformat(raw["deadline"][:10])
+    return SplitOut(**{**raw, "deadline": deadline}, triggers=split.triggers_plain(raw.get("dip_npr"), raw.get("recovery_npr"), deadline))
 
 
 @app.get("/api/v1/snapshots/{snapshot_id}")
@@ -670,30 +868,186 @@ def snapshot_detail(session: SessionDep, snapshot_id: str, asset: AssetDep) -> d
     return {"id": row.id, "created_at": row.created_at, **payload, "asset": asset.public()}
 
 
+class TrackForecastRowOut(BaseModel):
+    rate_date: date
+    estimate: float
+    low: float
+    high: float
+    actual: float
+    error_npr: float
+    error_pct: float
+    inside_range: bool
+    hours_before: float
+    snapshot_at: datetime
+
+
+class TrackForecastSummaryOut(BaseModel):
+    count: int
+    mean_abs_error_pct: float | None
+    mean_abs_error_npr: float | None
+    inside_range: int
+    small_sample: bool
+
+
+class TrackAdviceRowOut(BaseModel):
+    rate_date: date
+    decision: str
+    rule: str | None
+    price: float
+    advice_at: datetime
+    later_count: int
+    later_low: float | None
+    later_high: float | None
+    later_last: float | None
+    open: bool
+    outcome: str
+    good: bool | None
+
+
+class TrackAdviceSummaryOut(BaseModel):
+    days: int
+    status: str
+    windows: int
+    windows_needed: int
+    buys: int
+    mean_cost_vs_immediate: float | None
+
+
+class TrackForecastOut(BaseModel):
+    summary: TrackForecastSummaryOut
+    rows: list[TrackForecastRowOut]
+
+
+class TrackAdviceOut(BaseModel):
+    summary: TrackAdviceSummaryOut
+    rows: list[TrackAdviceRowOut]
+
+
+class TrackRecordOut(BaseModel):
+    """Computed at request time from stored snapshots and published prices. Rows newest first."""
+
+    asset: AssetOut
+    forecast: TrackForecastOut
+    advice: TrackAdviceOut
+
+
+@app.get("/api/v1/track-record", response_model=TrackRecordOut)
+def track_record(session: SessionDep, asset: AssetDep, limit: Annotated[int, Query(ge=1, le=400)] = 60) -> TrackRecordOut:
+    from datetime import timedelta
+    from types import SimpleNamespace
+
+    from gold_advisor.analytics import track_record as tr
+    from gold_advisor.domain import Decision
+
+    pub_rows = session.execute(
+        select(LocalMetalRateRow.rate_date, LocalMetalRateRow.published_at, LocalMetalRateRow.price_npr)
+        .where(
+            LocalMetalRateRow.source == Source.FENEGOSIDA.value,
+            LocalMetalRateRow.metal == asset.metal.value,
+            LocalMetalRateRow.purity == asset.purity.value,
+            LocalMetalRateRow.unit == MassUnit.TOLA.value,
+        )
+        .order_by(LocalMetalRateRow.rate_date.desc())
+        .limit(limit)
+    ).all()
+    publications = [tr.Publication(d, at, float(p)) for d, at, p in pub_rows]
+    snapshots: list[tr.Snapshot] = []
+    if publications:
+        since = datetime.combine(min(p.rate_date for p in publications) - timedelta(days=3), datetime.min.time(), tzinfo=UTC)
+        # Only the parts used here, not the full ~11 kB payloads.
+        for created_at, prices, decision in session.execute(
+            select(AnalysisSnapshotRow.created_at, AnalysisSnapshotRow.payload["prices"], AnalysisSnapshotRow.payload["decision"])
+            .where(AnalysisSnapshotRow.asset_id == asset.id, AnalysisSnapshotRow.created_at >= since)
+            .order_by(AnalysisSnapshotRow.created_at)
+        ):
+            p = market_data.normalized_payload(SimpleNamespace(payload={"prices": prices or {}, "decision": decision or {}}))
+            latest, nxt, d = p["prices"].get("nepal_latest") or {}, p["prices"].get("nepal_next") or {}, p["decision"]
+            snapshots.append(
+                tr.Snapshot(
+                    created_at=created_at,
+                    nepal_rate_date=date.fromisoformat(latest["rate_date"][:10]) if latest.get("rate_date") else None,
+                    next_estimate=nxt.get("estimate"),
+                    next_low=nxt.get("low"),
+                    next_high=nxt.get("high"),
+                    decision=Decision(d["decision"]) if d.get("decision") in Decision._value2member_map_ else None,
+                    rule=d.get("rule"),
+                )
+            )
+    # Outcomes need the 5 publications after each day, so they come from the same list.
+    forecast_rows = tr.forecast_rows(publications, snapshots)
+    advice_rows = tr.advice_rows(publications, snapshots)
+    return TrackRecordOut(
+        asset=AssetOut(**asset.public()),
+        forecast=TrackForecastOut(
+            summary=TrackForecastSummaryOut(**asdict(tr.forecast_summary(forecast_rows))),
+            rows=[TrackForecastRowOut(**asdict(r)) for r in forecast_rows],
+        ),
+        advice=TrackAdviceOut(
+            summary=TrackAdviceSummaryOut(**asdict(tr.advice_summary(advice_rows))),
+            rows=[TrackAdviceRowOut(**asdict(r)) for r in advice_rows],
+        ),
+    )
+
+
 class PlanOut(BaseModel):
     waiting_since: datetime | None
     completed_at: datetime | None
+    first_part_at: datetime | None = None
+    first_part_price: float | None = None
+    second_dip_npr: float | None = None
+    second_recovery_npr: float | None = None
+    second_deadline: date | None = None
+
+
+def _plan_out(plan: PurchasePlanRow | None) -> PlanOut:
+    if plan is None:
+        return PlanOut(waiting_since=None, completed_at=None)
+    num = lambda v: float(v) if v is not None else None  # noqa: E731
+    return PlanOut(
+        waiting_since=plan.waiting_since,
+        completed_at=plan.completed_at,
+        first_part_at=plan.first_part_at,
+        first_part_price=num(plan.first_part_price),
+        second_dip_npr=num(plan.second_dip_npr),
+        second_recovery_npr=num(plan.second_recovery_npr),
+        second_deadline=plan.second_deadline,
+    )
 
 
 @app.get("/api/v1/plan", response_model=PlanOut)
 def get_plan(session: SessionDep, asset: AssetDep) -> PlanOut:
-    plan = session.get(PurchasePlanRow, asset.id)
-    return PlanOut(waiting_since=plan.waiting_since if plan else None, completed_at=plan.completed_at if plan else None)
+    return _plan_out(session.get(PurchasePlanRow, asset.id))
 
 
 @app.post("/api/v1/plan/{action}", response_model=PlanOut)
-def update_plan(session: SessionDep, asset: AssetDep, action: Annotated[str, Path(pattern="^(purchased|restart)$")]) -> PlanOut:
-    """``purchased`` closes the plan; ``restart`` starts a new one. Nothing else resets the clock."""
+def update_plan(session: SessionDep, asset: AssetDep, action: Annotated[str, Path(pattern="^(purchased|restart|first_part)$")]) -> PlanOut:
+    """``purchased`` closes the plan; ``restart`` starts a new one; ``first_part`` records the first
+    half of a two-part purchase and keeps the latest advice's second-half triggers. Nothing else
+    resets the clock, and ``first_part`` does not."""
     now = datetime.now(UTC)
     plan = session.get(PurchasePlanRow, asset.id) or PurchasePlanRow(asset_id=asset.id)
     if action == "purchased":
         plan.completed_at = now
+    elif action == "first_part":
+        payload = market_data.normalized_payload(_latest_snapshot(session, asset))
+        raw = payload.get("split")
+        if not raw or payload["decision"]["decision"] != "BUY":
+            raise HTTPException(status_code=409, detail="The latest advice is not to buy in two parts.")
+        latest = payload["prices"].get("nepal_latest") or {}
+        plan.first_part_at = now
+        plan.first_part_price = latest.get("nepal_price")
+        plan.second_dip_npr, plan.second_recovery_npr = raw.get("dip_npr"), raw.get("recovery_npr")
+        plan.second_deadline = date.fromisoformat(raw["deadline"][:10])
     else:
         plan.waiting_since, plan.completed_at = None, None
+        plan.first_part_at = plan.first_part_price = None
+        plan.second_dip_npr = plan.second_recovery_npr = plan.second_deadline = None
     plan.updated_at = now
     session.add(plan)
     session.flush()
-    return PlanOut(waiting_since=plan.waiting_since, completed_at=plan.completed_at)
+    out = _plan_out(plan)
+    session.commit()  # the page reloads straight after
+    return out
 
 
 class WatchLevelsIn(BaseModel):
@@ -981,3 +1335,295 @@ def news_risk_clear(session: SessionDep, asset: AssetDep) -> dict:
     from gold_advisor import news_service
 
     return {"cleared": news_service.clear_risk(session, asset, datetime.now(UTC))}
+
+
+# --- Silver trading (Trade screen) ------------------------------------------------------
+# The app never places orders: it shows a plan and records what the owner says they did.
+
+
+def tradable_asset(asset: AssetDep) -> AssetDefinition:
+    if not asset.tradable:
+        raise HTTPException(status_code=404, detail="Trading is only for silver.")
+    return asset
+
+
+TradableDep = Annotated[AssetDefinition, Depends(tradable_asset)]
+
+
+class TradeSettingsIn(BaseModel):
+    budget: Annotated[float, Field(ge=1000, le=10_000_000)] = 100_000
+    gap_pct: Annotated[float | None, Field(ge=0, le=20)] = None  # the shop's buy-back gap; no default
+
+
+class TradeIn(BaseModel):
+    side: Literal["buy", "sell"]
+    quantity_tola: Annotated[float, Field(gt=0, le=10_000)]
+    price_npr: Annotated[float, Field(gt=0, le=10_000_000)]
+    traded_at: datetime
+    note: Annotated[str, Field(max_length=300)] = ""
+
+
+class TradeRecordOut(TradeIn):
+    id: int
+
+
+class TradePositionOut(BaseModel):
+    quantity_tola: float
+    cost_npr: float
+    average_price_npr: float | None
+    value_after_gap_npr: float | None  # at the latest Nepal price less the buy-back gap
+    unrealised_npr: float | None
+    realised_npr: float  # sales as entered minus average cost
+    parts: int
+
+
+class TradeReplayRowOut(BaseModel):
+    gap_pct: float
+    trades: int
+    winning: int
+    share_winning: float | None
+    total_npr: float
+    open_at_end: bool
+    first_day: str | None
+    last_day: str | None
+
+
+class TradeReplayOut(BaseModel):
+    computed_at: datetime | None
+    budget_npr: float
+    results: list[TradeReplayRowOut]
+
+
+class TradeOut(BaseModel):
+    asset: AssetOut
+    approved: bool  # false: the rule is a trial until the owner approves the replay numbers
+    state: str | None
+    plain: str | None
+    budget_npr: float
+    gap_pct: float | None
+    nepal_price: float | None
+    nepal_date: date | None
+    second_npr: float | None
+    target_npr: float | None
+    cut_npr: float | None
+    half_quantity_tola: float | None
+    profit_at_target_npr: float | None
+    loss_at_cut_npr: float | None
+    position: TradePositionOut
+    replay: TradeReplayOut | None
+    snapshot_created_at: datetime | None
+    trades: list[TradeRecordOut]
+
+
+@app.get("/api/v1/trade", response_model=TradeOut)
+def trade_overview(session: SessionDep, asset: TradableDep) -> TradeOut:
+    from gold_advisor import analysis, trading
+    from gold_advisor.persistence.models import TradeRow
+
+    budget, gap = analysis.trade_settings(session, asset)
+    held = analysis.trade_book(session, asset)
+    row = market_data.latest_snapshot(session, asset)
+    p = market_data.normalized_payload(row) if row else {"prices": {}}
+    latest = p["prices"].get("nepal_latest") or {}
+    price = latest.get("nepal_price")
+    factor = p.get("rupees_per_usd_oz")
+    raw = p.get("trade_plan") or {}
+    money, state, plain = {}, None, None
+    if raw.get("facts"):
+        facts = trading.MarketFacts(**{**raw["facts"], "levels": tuple(raw["facts"]["levels"])})
+        plan = trading.plan(facts, analysis.trade_holding(session, asset, held, factor))
+        money, state, plain = trading.money(plan, price, factor, asset.level_rupee_step, budget, gap, held), plan.state, plan.plain
+    value = round(held.quantity_tola * price * (1 - gap), 2) if (gap is not None and price and held.quantity_tola) else None
+    stored = session.get(AppSettingRow, f"trade_replay:{asset.id}")
+    replay = None
+    if stored is not None:
+        v = stored.value.get("value", {})
+        replay = TradeReplayOut(computed_at=v.get("computed_at"), budget_npr=v.get("budget_npr", budget),
+                                results=[TradeReplayRowOut(**r) for r in v.get("results", [])])
+    rows = session.scalars(select(TradeRow).where(TradeRow.asset_id == asset.id).order_by(TradeRow.traded_at.desc())).all()
+    return TradeOut(
+        asset=AssetOut(**asset.public()),
+        approved=trading.APPROVED,
+        state=state,
+        plain=plain,
+        budget_npr=budget,
+        gap_pct=gap * 100 if gap is not None else None,
+        nepal_price=price,
+        nepal_date=latest.get("rate_date"),
+        second_npr=money.get("second_npr"),
+        target_npr=money.get("target_npr"),
+        cut_npr=money.get("cut_npr"),
+        half_quantity_tola=money.get("half_quantity_tola"),
+        profit_at_target_npr=money.get("profit_at_target_npr"),
+        loss_at_cut_npr=money.get("loss_at_cut_npr"),
+        position=TradePositionOut(
+            quantity_tola=held.quantity_tola,
+            cost_npr=held.cost_npr,
+            average_price_npr=round(held.cost_npr / held.quantity_tola, 2) if held.quantity_tola else None,
+            value_after_gap_npr=value,
+            unrealised_npr=round(value - held.cost_npr, 2) if value is not None else None,
+            realised_npr=held.realised_npr,
+            parts=held.parts,
+        ),
+        replay=replay,
+        snapshot_created_at=row.created_at if row else None,
+        trades=[
+            TradeRecordOut(id=r.id, side=r.side, quantity_tola=float(r.quantity_tola), price_npr=float(r.price_npr),
+                           traded_at=r.traded_at, note=r.note)
+            for r in rows
+        ],
+    )
+
+
+@app.put("/api/v1/trade/settings", response_model=TradeSettingsIn)
+def put_trade_settings(session: SessionDep, asset: TradableDep, body: TradeSettingsIn) -> TradeSettingsIn:
+    key = f"trade:{asset.id}"
+    row = session.get(AppSettingRow, key) or AppSettingRow(key=key, value={})
+    row.value, row.updated_at = {"value": body.model_dump()}, datetime.now(UTC)
+    session.add(row)
+    session.commit()  # the page reloads straight after; don't race the dependency's commit
+    return body
+
+
+@app.post("/api/v1/trade/trades", response_model=TradeRecordOut)
+def add_trade(session: SessionDep, asset: TradableDep, body: TradeIn) -> TradeRecordOut:
+    from gold_advisor.persistence.models import TradeRow
+
+    row = TradeRow(asset_id=asset.id, **body.model_dump())
+    session.add(row)
+    session.flush()
+    trade_id = row.id
+    session.commit()
+    return TradeRecordOut(id=trade_id, **body.model_dump())
+
+
+@app.put("/api/v1/trade/trades/{trade_id}", response_model=TradeRecordOut)
+def correct_trade(session: SessionDep, asset: TradableDep, trade_id: int, body: TradeIn) -> TradeRecordOut:
+    from gold_advisor.persistence.models import TradeRow
+
+    row = session.get(TradeRow, trade_id)
+    if row is None or row.asset_id != asset.id:
+        raise HTTPException(status_code=404, detail="trade not found")
+    for k, v in body.model_dump().items():
+        setattr(row, k, v)
+    row.updated_at = datetime.now(UTC)
+    session.commit()
+    return TradeRecordOut(id=trade_id, **body.model_dump())
+
+
+@app.delete("/api/v1/trade/trades/{trade_id}")
+def delete_trade(session: SessionDep, asset: TradableDep, trade_id: int) -> dict:
+    """The owner's own record, entered by mistake. Market data is never deleted."""
+    from gold_advisor.persistence.models import TradeRow
+
+    row = session.get(TradeRow, trade_id)
+    if row is None or row.asset_id != asset.id:
+        raise HTTPException(status_code=404, detail="trade not found")
+    session.delete(row)
+    session.commit()
+    return {"deleted": trade_id}
+
+
+# --- Browser notifications (Web Push) ----------------------------------------------------
+
+
+class PushKeys(BaseModel):
+    p256dh: Annotated[str, Field(min_length=10, max_length=200, pattern=r"^[A-Za-z0-9_=-]+$")]
+    auth: Annotated[str, Field(min_length=10, max_length=200, pattern=r"^[A-Za-z0-9_=-]+$")]
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: Annotated[str, Field(min_length=12, max_length=2000, pattern=r"^https://")]
+    keys: PushKeys
+
+
+class PushEndpointIn(BaseModel):
+    endpoint: Annotated[str, Field(min_length=12, max_length=2000, pattern=r"^https://")]
+
+
+class AlertSettingsIn(BaseModel):
+    kinds: dict[str, bool]
+
+
+class PushStatusOut(BaseModel):
+    enabled: bool
+    subscribed: bool
+    kinds: dict[str, str]  # kind -> plain label
+    settings: dict[str, bool]
+
+
+def _push_enabled() -> None:
+    from gold_advisor import alerts
+
+    if not alerts.enabled():
+        raise HTTPException(status_code=404, detail="Notifications are not set up.")
+
+
+@app.post("/api/v1/push/status", response_model=PushStatusOut)
+def push_status(session: SessionDep, body: PushEndpointIn | None = None) -> PushStatusOut:
+    """POST so the endpoint URL (a capability) never lands in access logs as a query string."""
+    from gold_advisor import alerts
+    from gold_advisor.persistence.models import PushSubscriptionRow
+
+    subscribed = False
+    if body is not None:
+        subscribed = session.scalar(select(PushSubscriptionRow.id).where(PushSubscriptionRow.endpoint == body.endpoint)) is not None
+    from gold_advisor.decision import split
+
+    kinds = {k: v for k, v in alerts.KINDS.items() if k != "second_half" or split.ENABLED}
+    return PushStatusOut(enabled=alerts.enabled(), subscribed=subscribed, kinds=kinds, settings=alerts.settings(session))
+
+
+@app.post("/api/v1/push/subscriptions")
+def push_subscribe(session: SessionDep, body: PushSubscriptionIn) -> dict:
+    from sqlalchemy.dialects.postgresql import insert
+
+    from gold_advisor.persistence.models import PushSubscriptionRow
+
+    _push_enabled()
+    session.execute(
+        insert(PushSubscriptionRow)
+        .values(endpoint=body.endpoint, p256dh=body.keys.p256dh, auth=body.keys.auth)
+        .on_conflict_do_update(index_elements=["endpoint"], set_={"p256dh": body.keys.p256dh, "auth": body.keys.auth, "failure_count": 0})
+    )
+    session.commit()
+    return {"subscribed": True}
+
+
+@app.post("/api/v1/push/subscriptions/remove")
+def push_unsubscribe(session: SessionDep, body: PushEndpointIn) -> dict:
+    from sqlalchemy import delete
+
+    from gold_advisor.persistence.models import PushSubscriptionRow
+
+    session.execute(delete(PushSubscriptionRow).where(PushSubscriptionRow.endpoint == body.endpoint))
+    session.commit()
+    return {"subscribed": False}
+
+
+PUSH_TEST_COOLDOWN_SECONDS = 30
+
+
+@app.post("/api/v1/push/test")
+def push_test(session: SessionDep, body: PushEndpointIn, response: Response) -> dict:
+    from gold_advisor import alerts
+
+    _push_enabled()
+    if not cooldown_passed(session, "push_test", PUSH_TEST_COOLDOWN_SECONDS):
+        response.status_code = status.HTTP_429_TOO_MANY_REQUESTS
+        return {"sent": 0, "message": "A test was sent a moment ago."}
+    sent = alerts.send(session, "Test from Metal Advisor", "Notifications work on this device.", "/", endpoints=[body.endpoint])
+    return {"sent": sent, "message": "Sent. It should appear in a few seconds." if sent else "This device isn't subscribed any more. Turn notifications on again."}
+
+
+@app.put("/api/v1/settings/alerts")
+def put_alert_settings(session: SessionDep, body: AlertSettingsIn) -> dict:
+    from gold_advisor import alerts
+
+    value = {k: bool(v) for k, v in body.kinds.items() if k in alerts.KINDS}
+    row = session.get(AppSettingRow, alerts.SETTINGS_KEY) or AppSettingRow(key=alerts.SETTINGS_KEY, value={})
+    row.value, row.updated_at = {"value": {**alerts.settings(session), **value}}, datetime.now(UTC)
+    session.add(row)
+    out = row.value["value"]
+    session.commit()
+    return {"settings": out}

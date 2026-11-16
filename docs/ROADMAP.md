@@ -1,5 +1,38 @@
 # Roadmap
 
+**Revamp (planned 2026-11-16):** fresh data, concrete answers, a track record page, silver trading with alerts, and a new look. The build spec, with measurements and acceptance checks per phase, is in `docs/REVAMP_SPEC.md`.
+
+## Revamp status (2026-11-16)
+
+| Phase | Built | Waiting on the owner |
+|---|---|---|
+| 1 Fresh data | Outside-timer endpoint, self-refresh on open, live world price, honest ages, holiday verdict (rules-6), two-source cross-check | Set up cron-job.org (`docs/ARCHITECTURE.md`); then re-measure the schedule over 3 weekdays |
+| 3 Track record | Page, API, tests | Nothing |
+| 2 Concrete answers | "Where the price is", rupee floors and ceilings, US announcements, Today order; two-part buying built and **off** | Decision on two-part buying (numbers below) |
+| 4 Silver trading and alerts | Trade screen (trial), trades, two-year replay, Web Push | Approve or reject the trade rule (numbers below); create VAPID keys; test on phones |
+| 5 New look | Three samples in `docs/design-samples/` | Pick a sample |
+
+**Rules-6 (Phase 1.5):** a Nepal holiday with a healthy collector no longer blocks the verdict. The two-year replay judges publication days only, so it did not move: gold 617 days (348 BUY, 104 WAIT, 165 WATCH CLOSELY), silver 617 days (295 / 126 / 196), identical day by day before and after; following the advice cost +0.02% (gold) and −0.29% (silver) against buying on the first day of each week, as before.
+
+**Two-part buying (Phase 2.3), replay 2024-11-05 to 2026-11-15, same 88 weekly periods per metal, per tola, fees not included:**
+
+| | One purchase on the first BUY | Two-part rule | Weeks the rule applied | Two-part cheaper in |
+|---|---|---|---|---|
+| Gold | +0.02% vs the week's first day | +0.12% | 33 | 16 of 33; on average Rs 624 per tola more |
+| Silver | −0.29% | −0.13% | 25 | 10 of 25; on average Rs 23 per tola more |
+
+Two-part buying did not beat one purchase for either metal, so it ships switched off (`decision/split.py` `ENABLED = False`, rules version stays rules-6). The code, the plan columns (migration 0006) and the "I bought the first half" action are in place if the owner wants it anyway. Owner decision: pending.
+
+**Silver trade rule (Phase 4.1), replay 2024-11-05 to 2026-11-15 on Rs 1,00,000, buying at Nepal's price and selling back at that price less the gap:**
+
+| Buy-back gap | Trades | Made money | Total |
+|---|---|---|---|
+| 0% | 26 | 18 | +Rs 21,236 |
+| 2% | 26 | 13 | −Rs 25,188 |
+| 4% | 26 | 7 | −Rs 71,613 |
+
+With any realistic buy-back gap the rule loses money. The Trade screen says so in its first sentence and labels the plan "Trial only" (`trading.APPROVED = False`). Owner decision: pending.
+
 The full specification was agreed on 2026-11-02. It is split into phases so each one is usable and tested before the next starts.
 
 ## Phase 1: data foundation (built)

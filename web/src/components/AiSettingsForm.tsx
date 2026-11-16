@@ -56,7 +56,7 @@ export function AiSettingsForm({ settings, runner }: { settings: AiOverview["set
         Run automatically every 4 hours and when the advice changes (at most 12 times a day)
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-60">
+        <button type="submit" disabled={busy} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-60">
           Save
         </button>
         {message && <span role="status" className={`text-sm ${message.tone === "error" ? "text-wait" : "text-buy"}`}>{message.text}</span>}

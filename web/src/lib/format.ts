@@ -45,10 +45,29 @@ export function nepalDate(isoDate: string | null | undefined): string {
   );
 }
 
+/** "5 Nov 2024": a calendar date with its year. */
+export function longDate(isoDate: string | null | undefined): string {
+  if (!isoDate) return "—";
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).format(
+    new Date(`${isoDate.slice(0, 10)}T00:00:00Z`),
+  );
+}
+
 /** "3 Nov, 2:15 pm · 4 min ago": when something was worked out, as a date and as an age. */
 export function stamp(iso: string | null | undefined): string {
   if (!iso) return "not yet";
   return `${nepalTime(iso)} · ${ago(iso)}`;
+}
+
+/** An age in plain words: "40 seconds", "12 minutes", "6 hours", "2 days". */
+export function ageWords(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s} second${s === 1 ? "" : "s"}`;
+  const minutes = Math.round(s / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"}`;
+  return `${Math.round(hours / 24)} days`;
 }
 
 export function ago(iso: string | null | undefined, now = Date.now()): string {

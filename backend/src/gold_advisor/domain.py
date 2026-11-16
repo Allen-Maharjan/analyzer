@@ -86,6 +86,8 @@ class QualityFlag(StrEnum):
     CLOCK_SKEW = "clock_skew"  # source timestamp is in the future
     UNIT_MISMATCH = "unit_mismatch"  # tola and 10 g prices disagree
     PARTIAL_BUCKET = "partial_bucket"  # derived bar built from fewer underlying bars than a full session
+    SOURCES_DISAGREE = "sources_disagree"  # the two world-price sources differed by more than 0.5% in one run
+    UNCONFIRMED_JUMP = "unconfirmed_jump"  # jumped more than 5% in 30 min and the other source did not confirm; not used
 
 
 class FreshnessStatus(StrEnum):
@@ -93,6 +95,8 @@ class FreshnessStatus(StrEnum):
     STALE = "stale"
     MARKET_CLOSED = "market_closed"
     UNAVAILABLE = "unavailable"
+    # The source answered recently but has published nothing new (for example a Nepal holiday).
+    NOT_PUBLISHED = "not_published"
 
 
 class CollectorStatus(StrEnum):

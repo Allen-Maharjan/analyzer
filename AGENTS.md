@@ -4,7 +4,7 @@ Read these first, in order:
 
 1. `docs/ARCHITECTURE.md`: how the app runs (GitHub Actions + Neon + OpenRouter, plus the local Docker mode), secrets, limits, code map, and the rules that must not break.
 2. `PRODUCT.md`: who the owner is and what the product must do.
-3. `docs/ROADMAP.md`: what is built and what is next.
+3. `docs/ROADMAP.md`: what is built and what is next. `docs/REVAMP_SPEC.md` is the build spec for the current revamp.
 4. `DESIGN.md`: the dashboard's visual system, if you touch `web/`. It may lag the current look.
 
 Working rules:

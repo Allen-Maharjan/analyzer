@@ -4,8 +4,11 @@ Each day is judged once, at DECISION_TIME Nepal time, using only what existed th
 candles, Nepal prices already published, earlier dollar rates, and the FOMC calendar. The same
 functions as the live snapshot decide (analysis.timeframe_state, nepal.analyse, rules.decide).
 
-Not replayed: live quotes (the last completed 1h close stands in), the world-price score (it never
-changes the decision), the waiting clock, and the owner's watch levels (the asset defaults are used).
+Not replayed: live quotes (the last completed 1h close stands in), the waiting clock, and the owner's
+watch levels (the asset defaults are used). The world-price outlook, which only decides whether a BUY
+is split in two parts, is replayed from the 1h, 4h and 1D parts of the score plus macro and event
+risk (the live score also has 15m and 1W parts). US data-release dates exist from 2026 only, so
+earlier two-part deadlines use FOMC dates or the 7-day default.
 
 ``lookahead_check`` reruns sampled days on history cut off at the decision time and reports any day
 whose answer changes, which would mean the replay saw the future.
@@ -20,17 +23,20 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from gold_advisor import analysis, freshness
+from gold_advisor import analysis, freshness, trading
+from gold_advisor.analytics import position, score
 from gold_advisor.analytics.decision_evaluation import Evaluation, Observation, evaluate
 from gold_advisor.assets import AssetDefinition
-from gold_advisor.decision import nepal, rules
+from gold_advisor.decision import nepal, rules, split
 from gold_advisor.domain import NEPAL_TZ, UTC, Decision, MassUnit, Source, Timeframe
-from gold_advisor.persistence.models import CandleRow, EconomicEventRow, FxRateRow, LocalMetalRateRow
+from gold_advisor.persistence.models import CandleRow, EconomicEventRow, FxRateRow, LocalMetalRateRow, MacroObservationRow
 
-VERSION = "backtest-1"
+VERSION = "backtest-2"
 DECISION_TIME = time(12, 0)  # Nepal time, after the usual 10:00-11:00 publication
 TIMEFRAMES = (Timeframe.H1, Timeframe.H4, Timeframe.D1)
 DECIDING_TIMEFRAMES = (Timeframe.H4, Timeframe.D1)  # the only ones the rules read
+SCORE_TIMEFRAMES = (Timeframe.H1, Timeframe.H4, Timeframe.D1)  # for the replayed outlook
+MACRO_SERIES = ("DFII10", "DGS2")
 PUBLICATIONS_LOADED = 40
 FX_LOADED = 120
 FX_MAX_AGE_DAYS = 5
@@ -42,6 +48,8 @@ class History:
     publications: list[nepal.Publication]  # sorted by rate_date
     fx_mid: pd.Series  # NRB USD/NPR midpoint indexed by Timestamp(rate_date)
     major_events: list[tuple[datetime, str]]  # (scheduled_at UTC, title), sorted
+    announcements: list[tuple[datetime, str]] = ()  # major and high importance, sorted
+    macro: dict[str, pd.Series] | None = None  # FRED series indexed by Timestamp(obs_date)
 
 
 @dataclass(frozen=True)
@@ -52,6 +60,11 @@ class Day:
     decision: Decision
     rule: str
     next_price_change_pct: float | None
+    outlook: str | None = None
+    split_dip: float | None = None  # rupees; set when this BUY would be split in two parts
+    split_recovery: float | None = None
+    split_deadline: date | None = None
+    trade_facts: trading.MarketFacts | None = None  # what the silver trade rule reads that day
 
 
 def load(session: Session, asset: AssetDefinition) -> History:
@@ -77,14 +90,24 @@ def load(session: Session, asset: AssetDefinition) -> History:
         .order_by(FxRateRow.rate_date)
     ).all()
     events = session.execute(
-        select(EconomicEventRow.scheduled_at, EconomicEventRow.title)
-        .where(EconomicEventRow.importance == "major").order_by(EconomicEventRow.scheduled_at)
+        select(EconomicEventRow.scheduled_at, EconomicEventRow.title, EconomicEventRow.importance)
+        .where(EconomicEventRow.importance.in_(("major", "high"))).order_by(EconomicEventRow.scheduled_at)
     ).all()
+    macro = {}
+    for series_id in MACRO_SERIES:
+        rows = session.execute(
+            select(MacroObservationRow.obs_date, MacroObservationRow.value)
+            .where(MacroObservationRow.source == Source.FRED.value, MacroObservationRow.series_id == series_id)
+            .order_by(MacroObservationRow.obs_date)
+        ).all()
+        macro[series_id] = pd.Series({pd.Timestamp(d): (float(v) if v is not None else np.nan) for d, v in rows}, dtype=float)
     return History(
         bars=bars,
         publications=[nepal.Publication(d, at, float(p)) for d, at, p in pubs],
         fx_mid=pd.Series({pd.Timestamp(d): (float(b) + float(s)) / 2 for d, b, s in fx}, dtype=float).sort_index(),
-        major_events=[(at, title) for at, title in events],
+        major_events=[(at, title) for at, title, imp in events if imp == "major"],
+        announcements=[(at, title) for at, title, _ in events],
+        macro=macro,
     )
 
 
@@ -104,6 +127,8 @@ def cut_off(history: History, now: datetime) -> History:
         publications=[p for p in history.publications if nepal.publication_instant(p)[0] <= now],
         fx_mid=history.fx_mid[history.fx_mid.index <= pd.Timestamp(today)],
         major_events=history.major_events,  # FOMC dates are announced a year ahead
+        announcements=history.announcements,  # release dates are published ahead too
+        macro={k: v[v.index < pd.Timestamp(today)] for k, v in (history.macro or {}).items()},
     )
 
 
@@ -125,25 +150,27 @@ def decide_at(history: History, asset: AssetDefinition, now: datetime) -> Day | 
     if h4.empty or freshness.candles(Timeframe.H4, h4.index[-1], now, asset.calendar).status not in analysis.OK_STATUSES:
         issues.append(f"Recent world {asset.label.lower()} price history is out of date.")
 
-    per_tf, states, ind_by_tf = {}, {}, {}
-    for tf in DECIDING_TIMEFRAMES:
+    per_tf, states, ind_by_tf, detail = {}, {}, {}, {}
+    for tf in SCORE_TIMEFRAMES:
         if bars[tf].empty:
             continue
-        ind_by_tf[tf], per_tf[tf], states[tf], _ = analysis.timeframe_state(bars[tf], tf, now, price_now, list(asset.watch_levels))
+        ind_by_tf[tf], per_tf[tf], states[tf], detail[tf.value] = analysis.timeframe_state(bars[tf], tf, now, price_now, list(asset.watch_levels))
     h4_ok, h4_detail = analysis.h4_stabilization(ind_by_tf[Timeframe.H4]) if Timeframe.H4 in ind_by_tf else (None, "no 4h bars")
 
     xau_by_end = pd.Series(h1["close"].to_numpy(), index=h1.index + Timeframe.H1.duration)
     lag = nepal.analyse(pubs, xau_by_end, fx_mid, price_now)
-    hourly_vol = float(np.log(h1["close"]).diff().tail(120).std()) if len(h1) > 30 else None
+    hourly_vol = nepal.hourly_volatility(h1["close"])
     nxt = nepal.forecast_next(lag, now, hourly_vol, asset.calendar.is_open, asset.nepal_price_step)
     event = next(((at, title) for at, title in history.major_events if at > now - timedelta(hours=1)), None)
 
+    strong = analysis.strong_breakdown({tf: per_tf[tf] for tf in DECIDING_TIMEFRAMES if tf in per_tf}, states)
+    hours_to_event = (event[0] - now).total_seconds() / 3600 if event else None
     result = rules.decide(rules.DecisionInputs(
         essential_issues=issues,
         lag=lag,
-        hours_to_next_major_event=(event[0] - now).total_seconds() / 3600 if event else None,
+        hours_to_next_major_event=hours_to_event,
         next_event_title=event[1] if event else None,
-        strong_breakdown=analysis.strong_breakdown(per_tf, states),
+        strong_breakdown=strong,
         h4_stabilized=h4_ok,
         h4_detail=h4_detail,
         score=None,
@@ -154,7 +181,34 @@ def decide_at(history: History, asset: AssetDefinition, now: datetime) -> Day | 
         next_price=nxt.estimate if nxt else None,
         next_price_change_pct=nxt.change_pct if nxt else None,
     ))
-    return Day(today, now, pubs[-1].price, result.decision, result.rule, nxt.change_pct if nxt else None)
+    components = score.aggregate_technical(per_tf)
+    macro = {k: v[v.index < pd.Timestamp(today)] for k, v in (history.macro or {}).items()}  # published before today
+    components["macro"] = score.macro(macro.get("DFII10"), macro.get("DGS2"), None)
+    components["event_risk"] = score.event_risk(score.base_direction(components), hours_to_event)
+    outlook = score.outlook(score.combine(components)[0])
+    dip = recovery = deadline = None
+    reason = split.reason_for(result.decision, outlook, bool(strong and h4_ok))
+    if reason and lag.premium_mean is not None:
+        factor = float(fx_mid.iloc[-1]) * nepal.OUNCES_PER_TOLA * (1 + lag.premium_mean)
+        keys = position.key_levels(
+            {tf: d["levels"] for tf, d in detail.items() if tf != Timeframe.H1.value},
+            {tf: d["level_states"] for tf, d in detail.items() if tf != Timeframe.H1.value},
+            price_now, factor, asset.level_rupee_step,
+        )
+        plan = split.plan(
+            reason,
+            [k.rupees for k in keys if k.kind == "floor" and k.rupees is not None],
+            [k.rupees for k in keys if k.kind == "ceiling" and k.rupees is not None],
+            pubs[-1].price,
+            now,
+            list(history.announcements),
+        )
+        dip, recovery, deadline = plan.dip_npr, plan.recovery_npr, plan.deadline
+    facts = None
+    if asset.tradable and Timeframe.D1.value in detail:
+        facts = trading.market_facts(bars[Timeframe.D1], detail["1D"]["level_states"], detail["1D"]["levels"])
+    return Day(today, now, pubs[-1].price, result.decision, result.rule, nxt.change_pct if nxt else None,
+               outlook.value if outlook else None, dip, recovery, deadline, facts)
 
 
 def run(history: History, asset: AssetDefinition, start: date, end: date) -> list[Day]:
@@ -209,3 +263,82 @@ def plain_summary(result: Evaluation, horizon_days: int) -> str:
         f"{result.mean_regret * 100:.2f}% cheaper than the advice's purchase, and "
         f"{result.mean_baseline_regret * 100:.2f}% cheaper than buying on the first day. Fees are not included."
     )
+
+
+def _second_half(days: list[Day], i: int) -> Day | None:
+    """The first later publication day that meets a second-half trigger of the BUY on ``days[i]``."""
+    first = days[i]
+    for d in days[i + 1 :]:
+        if (first.split_dip is not None and d.nepal_price <= first.split_dip) or (
+            first.split_recovery is not None and d.nepal_price >= first.split_recovery
+        ) or d.day >= first.split_deadline:
+            return d
+    return None
+
+
+def compare_split(days: list[Day], horizon_days: int = 7, max_gap_days: int = 2) -> dict:
+    """One purchase on the first BUY of each period against the two-part rule, over the same
+    non-overlapping periods as ``decision_evaluation.evaluate``. Costs are against buying on the
+    period's first day, per tola, fees not included. A period whose second half has not been
+    triggered by the end of the data is left out."""
+    one, two, diff_npr, diff_split, cheaper = [], [], [], [], 0
+    split_windows = left_out = 0
+    i = 0
+    while i < len(days):
+        deadline = days[i].day + timedelta(days=horizon_days)
+        j = i + 1
+        while j < len(days) and days[j].day <= deadline:
+            j += 1
+        if j == len(days) and days[j - 1].day < deadline:
+            break
+        window = days[i:j]
+        gaps = [(b.day - a.day).days for a, b in zip(window, window[1:])]
+        if len(window) >= 2 and max(gaps, default=0) <= max_gap_days and (deadline - window[-1].day).days <= max_gap_days:
+            k = next((n for n in range(i, j) if days[n].decision is Decision.BUY), None)
+            whole = days[k] if k is not None else window[-1]
+            paid_one = whole.nepal_price
+            paid_two = paid_one
+            if k is not None and days[k].split_deadline is not None:
+                second = _second_half(days, k)
+                if second is None:
+                    left_out += 1
+                    i = j
+                    continue
+                split_windows += 1
+                paid_two = (days[k].nepal_price + second.nepal_price) / 2
+                diff_split.append(paid_two - paid_one)
+                cheaper += paid_two < paid_one
+            initial = window[0].nepal_price
+            one.append(paid_one / initial - 1)
+            two.append(paid_two / initial - 1)
+            diff_npr.append(paid_two - paid_one)
+        i = j
+    n = len(one)
+    mean = lambda xs: sum(xs) / len(xs) if xs else None  # noqa: E731
+    return {
+        "windows": n,
+        "split_windows": split_windows,
+        "left_out_untriggered": left_out,
+        "one_purchase_mean_cost_pct": mean(one) * 100 if n else None,
+        "two_part_mean_cost_pct": mean(two) * 100 if n else None,
+        "two_minus_one_npr_per_tola_all_windows": mean(diff_npr),
+        "two_minus_one_npr_per_tola_split_windows": mean(diff_split),
+        "split_windows_cheaper": cheaper,
+        "verdict": (
+            None if not split_windows else
+            "two-part buying was cheaper on average" if mean(diff_split) < 0 else "one purchase was cheaper or equal on average"
+        ),
+    }
+
+
+TRADE_GAPS = (0.0, 0.02, 0.04)
+
+
+def trade_replay(days: list[Day], budget: float = trading.DEFAULT_BUDGET) -> dict:
+    """The silver trade rule over the replay days, at buy-back gaps of 0%, 2% and 4%."""
+    series = [(d.day.isoformat(), d.nepal_price, d.trade_facts) for d in days]
+    return {
+        "version": trading.VERSION,
+        "budget_npr": budget,
+        "results": [trading.replay(series, gap, budget) for gap in TRADE_GAPS],
+    }

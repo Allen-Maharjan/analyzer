@@ -9,10 +9,10 @@ const WIDTH = "max-w-2xl lg:max-w-6xl";
 export function AppShell({ children, asset = "gold" }: { children: React.ReactNode; asset?: string }) {
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-line bg-ground/95 backdrop-blur-sm">
+      <header className="metal-bottom sticky top-0 z-10 bg-ground/95 backdrop-blur-sm">
         <div className={`mx-auto flex ${WIDTH} items-center justify-between gap-3 px-4 py-2`}>
           <Nav asset={asset} />
-          <RefreshButton />
+          <RefreshButton asset={asset} />
         </div>
       </header>
       <main className={`mx-auto ${WIDTH} px-4 pb-20 pt-4`}><AssetSelector asset={asset} />{children}</main>
@@ -48,13 +48,38 @@ export function CardColumns({ left, right }: { left: React.ReactNode[]; right: R
   );
 }
 
+/**
+ * Like CardColumns, but phones show the cards in exactly the order given, whichever column each
+ * belongs to on large screens. Cards that are null, undefined or false are skipped.
+ */
+export function StackColumns({ items }: { items: { side: "left" | "right"; card: React.ReactNode }[] }) {
+  const shown = items.filter((item) => item.card !== null && item.card !== undefined && item.card !== false);
+  const column = (side: "left" | "right") => (
+    <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+      {shown.map((item, i) =>
+        item.side === side ? (
+          <div key={i} className="min-w-0 [&>*]:mt-0" style={{ order: i }}>
+            {item.card}
+          </div>
+        ) : null,
+      )}
+    </div>
+  );
+  return (
+    <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-start">
+      {column("left")}
+      {column("right")}
+    </div>
+  );
+}
+
 /** A titled panel. `updated` (ISO time) shows when its numbers were worked out. */
 export function Section({ title, updated, className = "", children }: { title?: string; updated?: string | null; className?: string; children: React.ReactNode }) {
   return (
     <section className={`mt-4 min-w-0 rounded-2xl border border-line bg-panel p-5 ${className}`}>
       {(title || updated) && (
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          {title && <h2 className="text-base font-semibold">{title}</h2>}
+          {title && <h2 className="text-[1.2rem] font-bold leading-snug">{title}</h2>}
           {updated && <p className="num text-xs text-ink-2">Updated {stamp(updated)}</p>}
         </div>
       )}

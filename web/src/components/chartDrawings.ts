@@ -1,3 +1,4 @@
+import { cssColor } from "@/lib/theme";
 import type {
   IChartApi,
   IPrimitivePaneRenderer,
@@ -20,8 +21,9 @@ export const POINTS_NEEDED: Record<DrawingKind, number> = { trend: 2, horizontal
 export const FIB_RATIOS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 // Blue keeps drawings apart from the green/red support and resistance lines and the ochre watch level.
-const COLOR = "#1d4ed8";
-const FILL = "rgb(29 78 216 / 0.08)";
+// Read at draw time, so drawings follow the theme (--color-draw in globals.css).
+const draw = () => cssColor("var(--color-draw)");
+const fill = () => `${draw()}14`;
 const HIT_PX = 8;
 
 export function newDrawingId(): string {
@@ -169,8 +171,8 @@ export class DrawingLayer implements ISeriesPrimitive<Time> {
     if (pts.some((p) => p == null)) return;
     const [a, b] = pts as Px[];
     ctx.save();
-    ctx.strokeStyle = COLOR;
-    ctx.fillStyle = COLOR;
+    ctx.strokeStyle = draw();
+    ctx.fillStyle = draw();
     ctx.lineWidth = selected ? 2.5 : 1.75;
     ctx.font = "500 11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
     ctx.textBaseline = "middle";
@@ -183,16 +185,16 @@ export class DrawingLayer implements ISeriesPrimitive<Time> {
     } else if (d.kind === "rectangle") {
       const x = Math.min(a.x, b.x);
       const y = Math.min(a.y, b.y);
-      ctx.fillStyle = FILL;
+      ctx.fillStyle = fill();
       ctx.fillRect(x, y, Math.abs(b.x - a.x), Math.abs(b.y - a.y));
       ctx.strokeRect(x, y, Math.abs(b.x - a.x), Math.abs(b.y - a.y));
     } else {
       // Retracement levels between the two prices, measured back from the second point.
       const left = Math.min(a.x, b.x);
       const [p1, p2] = [d.points[0].price, d.points[1].price];
-      ctx.fillStyle = FILL;
+      ctx.fillStyle = fill();
       ctx.fillRect(left, Math.min(a.y, b.y), width - left, Math.abs(b.y - a.y));
-      ctx.fillStyle = COLOR;
+      ctx.fillStyle = draw();
       ctx.lineWidth = selected ? 1.75 : 1;
       for (const r of FIB_RATIOS) {
         const level = p2 - r * (p2 - p1);
@@ -210,7 +212,7 @@ export class DrawingLayer implements ISeriesPrimitive<Time> {
       for (const p of d.kind === "horizontal" ? [a] : [a, b]) {
         ctx.beginPath();
         ctx.arc(d.kind === "horizontal" ? width / 2 : p.x, p.y, 4.5, 0, Math.PI * 2);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = cssColor("var(--color-panel)");
         ctx.fill();
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -230,9 +232,9 @@ export class DrawingLayer implements ISeriesPrimitive<Time> {
     const w = ctx.measureText(text).width + 8;
     const left = align === "right" ? x - w : x;
     ctx.save();
-    ctx.fillStyle = "rgb(255 255 255 / 0.9)";
+    ctx.fillStyle = cssColor("var(--color-panel)");
     ctx.fillRect(left, y - 8, w, 16);
-    ctx.fillStyle = COLOR;
+    ctx.fillStyle = draw();
     ctx.textAlign = "left";
     ctx.fillText(text, left + 4, y);
     ctx.restore();

@@ -17,6 +17,8 @@ import {
 } from "lightweight-charts";
 import { useEffect, useRef } from "react";
 
+import { cssColor, useResolvedTheme } from "@/lib/theme";
+
 import { DrawingLayer, POINTS_NEEDED, TimeAxis, newDrawingId, type Drawing, type DrawingPoint, type Tool } from "@/components/chartDrawings";
 
 type Candle = { bucket_start: string; open: number; high: number; low: number; close: number };
@@ -44,14 +46,15 @@ export const PANELS = [
 export type OverlayId = (typeof OVERLAYS)[number]["id"];
 export type PanelId = (typeof PANELS)[number]["id"];
 
-// Palette tokens from globals.css. Lightweight Charts draws on canvas, so it needs literal colours.
-const INK = "#1c1917";
-const INK_2 = "#57534e";
-const QUIET = "#a8a29e";
-const ACCENT = "#a16207";
-const BUY = "#15803d";
-const WAIT = "#b91c1c";
-const GRID = "#f0f0f1";
+// Palette tokens from globals.css. The canvas needs literal colours, so they are read with cssColor()
+// when the chart is built (and rebuilt when the theme changes); the HTML legend uses them as they are.
+const INK = "var(--color-ink)";
+const INK_2 = "var(--color-ink-2)";
+const QUIET = "var(--color-ink-2)";
+const ACCENT = "var(--color-accent)";
+const BUY = "var(--color-buy)";
+const WAIT = "var(--color-wait)";
+const GRID = "var(--color-line)";
 
 const MAIN_HEIGHT = 260;
 const PANEL_HEIGHT = 110;
@@ -175,6 +178,7 @@ export function CandleChart({
   // Keep the zoom and scroll position when fresh bars arrive each minute.
   const viewRef = useRef<{ timeframe: string; range: IRange<Time> } | null>(null);
   const cancelDrawRef = useRef<() => void>(() => {});
+  const theme = useResolvedTheme();
 
   useEffect(() => {
     const el = ref.current;
@@ -184,12 +188,12 @@ export function CandleChart({
       ...(fill ? { autoSize: true } : { height: MAIN_HEIGHT + shownPanels.length * PANEL_HEIGHT }),
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
-        textColor: "#5f5f67",
+        textColor: cssColor(INK_2),
         attributionLogo: false,
         fontSize: 11,
-        panes: { separatorColor: "#e7e5e4", separatorHoverColor: "#e7e5e4", enableResize: false },
+        panes: { separatorColor: cssColor(GRID), separatorHoverColor: cssColor(GRID), enableResize: false },
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: GRID } },
+      grid: { vertLines: { visible: false }, horzLines: { color: cssColor(GRID) } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: timeframe !== "1D" },
       crosshair: { horzLine: { visible: interactive } },
@@ -199,10 +203,10 @@ export function CandleChart({
     chartRef.current = chart;
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: BUY,
-      downColor: WAIT,
-      wickUpColor: BUY,
-      wickDownColor: WAIT,
+      upColor: cssColor(BUY),
+      downColor: cssColor(WAIT),
+      wickUpColor: cssColor(BUY),
+      wickDownColor: cssColor(WAIT),
       borderVisible: false,
       priceLineVisible: false,
     });
@@ -229,7 +233,7 @@ export function CandleChart({
       rank[level.kind] += 1; // levels arrive nearest first: S1 is the closest support, R1 the closest resistance
       candleSeries.createPriceLine({
         price: level.price,
-        color: look.color,
+        color: cssColor(look.color),
         lineWidth: level.kind === "watch" ? 1 : 2,
         lineStyle: look.style,
         axisLabelVisible: true,
@@ -254,12 +258,12 @@ export function CandleChart({
       let series: ISeriesApi<SeriesType>;
       if (line.histogram) {
         const hist = chart.addSeries(HistogramSeries, { ...common, base: 0 }, pane);
-        hist.setData(data.map((d) => ({ ...d, color: d.value >= 0 ? "rgb(21 128 61 / 0.35)" : "rgb(185 28 28 / 0.35)" })));
+        hist.setData(data.map((d) => ({ ...d, color: `${cssColor(d.value >= 0 ? BUY : WAIT)}59` })));
         series = hist;
       } else {
         const ln = chart.addSeries(
           LineSeries,
-          { ...common, color: line.color, lineWidth: line.width ?? 1, lineStyle: line.style ?? LineStyle.Solid, crosshairMarkerRadius: 3 },
+          { ...common, color: cssColor(line.color), lineWidth: line.width ?? 1, lineStyle: line.style ?? LineStyle.Solid, crosshairMarkerRadius: 3 },
           pane,
         );
         ln.setData(data);
@@ -278,7 +282,7 @@ export function CandleChart({
         const series = addLine(i + 1, line, spec.format, spec.range);
         if (j === 0) {
           for (const g of spec.guides ?? []) {
-            series.createPriceLine({ price: g, color: QUIET, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+            series.createPriceLine({ price: g, color: cssColor(QUIET), lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
           }
         }
       });
@@ -295,7 +299,7 @@ export function CandleChart({
       for (const g of groups) {
         const box = document.createElement("div");
         box.className = "pointer-events-none absolute left-1 flex max-w-[calc(100%-4.5rem)] flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md px-1.5 py-0.5 text-[11px] leading-4 text-ink-2";
-        box.style.background = "rgb(255 255 255 / 0.88)";
+        box.style.background = "color-mix(in srgb, var(--color-panel) 88%, transparent)";
         box.dataset.pane = String(g.pane);
         legendEl.appendChild(box);
         legends.push(box);
@@ -447,7 +451,7 @@ export function CandleChart({
     };
     // shownPanels/shownOverlays are derived from props; join them so the effect reruns on real changes only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join(), overlays.includes("levels"), interactive, fill]);
+  }, [candles, levels, timeframe, indicators, shownPanels.join(), shownOverlays.join(), overlays.includes("levels"), interactive, fill, theme]);
 
   // New or removed drawings and selection: redraw without rebuilding the chart.
   useEffect(() => {

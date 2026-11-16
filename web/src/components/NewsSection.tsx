@@ -139,7 +139,7 @@ export function NewsSection({ news, asset, label }: { news: NewsOverview; asset:
                     e.preventDefault();
                     flag(a.id);
                   }}
-                  className="mt-2 grid gap-3 rounded-xl border border-line bg-ground p-3"
+                  className="mt-2 grid gap-3 rounded-xl border border-line bg-inset p-3"
                 >
                   <label className="grid gap-1 text-sm">
                     <span className="font-medium">Why does this make you want to wait?</span>
@@ -153,7 +153,7 @@ export function NewsSection({ news, asset, label }: { news: NewsOverview; asset:
                   </label>
                   <p className="text-xs text-ink-2">If the advice says Buy, it will say Wait until this story is a day old or you clear it.</p>
                   <div className="flex gap-2">
-                    <button type="submit" disabled={busy || !reason.trim()} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-60">
+                    <button type="submit" disabled={busy || !reason.trim()} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60">
                       Save
                     </button>
                     <button type="button" onClick={() => setFlagging(null)} className="min-h-11 rounded-xl border border-line bg-panel px-4 text-sm font-medium transition-colors hover:bg-hover">

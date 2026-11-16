@@ -12,11 +12,11 @@ Pinned by the specification: Next.js, TypeScript, Tailwind CSS, TradingView Ligh
 
 ## Users
 
-One household with one owner login. The owner is not a trader and does not understand technical analysis. The owner checks the app on a phone, now and then during the day, to decide whether to make one complete gold purchase now or wait a few days.
+One household with one owner login. The owner is not a trader and does not understand technical analysis. The owner checks the app on a phone, now and then during the day, to decide whether to make one complete gold purchase now or wait a few days. Exception: a separate Trade screen, for silver only, shows a buy-and-sell plan with a Rs 1,00,000 budget (added 2026-11-16; a trial until the owner approves its test results).
 
 ## Product Purpose
 
-Tell a non-expert, in plain English, whether today is a reasonable day to buy gold in Nepal (BUY), whether to wait briefly (WAIT), or whether to keep watching (WATCH CLOSELY), and why. Success means the owner makes one purchase at a sensible moment without having to read charts.
+Tell a non-expert, in plain English, whether today is a reasonable day to buy gold in Nepal (BUY), whether to wait briefly (WAIT), or whether to keep watching (WATCH CLOSELY), and why. Success means the owner makes one purchase at a sensible moment without having to read charts. The three-word vocabulary does not apply on the silver Trade screen, which uses its own plain states (stay out, buy the first or second half, hold, take profit, cut the loss). Gold never gets sell advice.
 
 ## Positioning
 
@@ -24,10 +24,10 @@ The advice is built around Nepal's published FENEGOSIDA price and how it lags wo
 
 ## Operating Context
 
-- Nepal gold prices are published once a day (usually 10:00–11:00 Nepal time, no Saturday publication). The dollar rate (NRB) is also daily.
-- World gold trades almost around the clock; the app refreshes it every minute.
-- Analysis runs every 15 minutes and after each Nepal or dollar-rate update.
-- The owner may press a refresh button to re-check daily prices.
+- Nepal gold prices are published once a day (usually 10:00–11:00 Nepal time, no Saturday publication). The dollar rate (NRB) is also daily. On Nepal holidays nothing is published; the app still advises and says the price may be old.
+- World gold trades almost around the clock. The Today page reads it live when opened (refreshing every minute while open) and shows its age.
+- A full analysis runs every 30 minutes (started by an outside timer), and again when the app is opened with advice over 20 minutes old. The page says how old the advice is when it is over 45 minutes old.
+- The owner may press a refresh button to re-check daily prices; the page waits for the new advice (about 3 minutes) before saying it is shown.
 - A seven-day waiting review: the app never forces a purchase and never silently restarts the waiting period.
 
 ## Capabilities and Constraints
@@ -37,7 +37,7 @@ The advice is built around Nepal's published FENEGOSIDA price and how it lags wo
 - Plain-language summary first; technical detail (indicators, scores, levels, premium) only behind a clearly labelled "View detailed analysis" control.
 - Decision colours: green BUY, red WAIT, amber WATCH CLOSELY, always paired with a text label and icon.
 - Every price shows its age and source; stale data is labelled, not hidden.
-- Never recommend splitting the purchase.
+- The app may advise buying gold in two parts, never more than two (owner decision 2026-11-16, replacing "never recommend splitting"). It is switched off for now: the two-year replay found one purchase cheaper for both metals (`docs/ROADMAP.md`).
 - Language: English. Nepali gold labels may appear where the source uses them.
 
 ## Brand Commitments

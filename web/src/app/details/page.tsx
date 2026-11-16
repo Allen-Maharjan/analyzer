@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppShell, CardColumns, ErrorState, Section } from "@/components/AppShell";
 import type { ChartLevel } from "@/components/CandleChart";
 import { WorldChart } from "@/components/WorldChart";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { DecisionLabel } from "@/components/Decision";
 import { PROVIDER_NAMES, type AiOverview } from "@/lib/ai";
 import { BackendError, backend, backendOrNull, type Dashboard } from "@/lib/backend";
@@ -115,11 +116,13 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
   const { id, asset = "gold" } = await searchParams;
   let snapshot: Snapshot | null = null;
   let candles: CandleSeries | null = null;
+  let latest: Dashboard | null = null;
   const ai = await backend<AiOverview>(withAsset("/api/v1/ai", asset)).catch(() => null);
   // The chart is live, so it shows the watch levels saved now, not those of the last analysis run.
   const savedWatch = await backend<{ levels: number[] }>(withAsset("/api/v1/settings/watch-levels", asset)).catch(() => null);
   try {
-    const snapshotId = id && /^[0-9a-f-]{36}$/.test(id) ? id : (await backendOrNull<Dashboard>(withAsset("/api/v1/dashboard", asset)))?.snapshot_id;
+    latest = await backendOrNull<Dashboard>(withAsset("/api/v1/dashboard", asset));
+    const snapshotId = id && /^[0-9a-f-]{36}$/.test(id) ? id : latest?.snapshot_id;
     if (snapshotId) {
       [snapshot, candles] = await Promise.all([
         backendOrNull<Snapshot>(withAsset(`/api/v1/snapshots/${snapshotId}`, asset)),
@@ -177,6 +180,15 @@ export default async function DetailsPage({ searchParams }: { searchParams: Prom
 
   return (
     <AppShell asset={asset}>
+      {latest && (
+        <AutoRefresh
+          asset={asset}
+          createdAt={latest.created_at}
+          ageSeconds={latest.age_seconds}
+          marketOpen={latest.market_open}
+          reloadHref={withAsset("/details", asset)}
+        />
+      )}
       <Link href={withAsset("/", asset)} className="-ml-1 inline-flex min-h-11 items-center gap-1 text-[15px] text-ink-2 hover:text-ink">
         <ArrowLeft aria-hidden className="size-4" strokeWidth={1.75} /> Today
       </Link>

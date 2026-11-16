@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     github_repo: str = ""  # e.g. "Allen-Maharjan/analyzer"
     github_workflow: str = "collect.yml"
     github_ref: str = "main"
+    # Bearer token for POST /api/v1/cron/tick, called by the outside timer (cron-job.org). It only
+    # starts an update; it is not GA_INTERNAL_TOKEN. Empty turns the endpoint off (404).
+    cron_token: str = ""
+    # Web Push (browser notifications). Both empty turns notifications off. The private key is the
+    # base64url raw key or PEM from a VAPID key pair; the subject is "mailto:you@example.com".
+    vapid_private_key: str = ""
+    vapid_subject: str = ""
 
     # FreeNewsAPI key. Read from FREENEWSAPI_KEY (no GA_ prefix); sent only in x-api-key.
     freenewsapi_key: str = Field(default="", validation_alias="FREENEWSAPI_KEY")

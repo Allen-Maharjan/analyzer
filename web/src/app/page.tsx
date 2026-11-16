@@ -1,13 +1,16 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Info } from "lucide-react";
 import Link from "next/link";
 
-import { AppShell, CardColumns, ErrorState, Section } from "@/components/AppShell";
+import { AppShell, ErrorState, Section, StackColumns } from "@/components/AppShell";
 import { DecisionLabel, decisionStyle } from "@/components/Decision";
 import { NepalPriceChart } from "@/components/NepalPriceChart";
 import { PlanActions } from "@/components/PlanActions";
 import { ScenarioBar } from "@/components/ScenarioBar";
 import { AskAiButton } from "@/components/AskAiButton";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { LiveNextPrice } from "@/components/LiveNextPrice";
 import { NewsSection } from "@/components/NewsSection";
+import { KeyLevels, PositionFacts, TwoPartPlan, UpcomingAnnouncements } from "@/components/TodayCards";
 import type { NewsOverview } from "@/lib/news";
 import { PROVIDER_NAMES, type AiOverview } from "@/lib/ai";
 import { BackendError, backend, backendOrNull, type Dashboard } from "@/lib/backend";
@@ -22,6 +25,7 @@ const STATUS_WORDS: Record<string, string> = {
   market_closed: "market closed",
   stale: "out of date",
   unavailable: "not available",
+  not_published: "no new price yet",
 };
 
 type Plan = { waiting_since: string | null; completed_at: string | null };
@@ -69,19 +73,29 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
   const previous = previousPoint?.price ?? null;
   const change = previous != null && d.prices.nepal_per_tola != null ? d.prices.nepal_per_tola - previous : null;
   const next = d.prices.nepal_next ?? null;
-  const nextChange = next && d.prices.nepal_per_tola != null ? next.estimate - d.prices.nepal_per_tola : 0;
   const sourceNames = Object.fromEntries(d.sources.map(s => [s.dataset, s.dataset === "usd_npr" ? "Dollar rate" : s.dataset.startsWith("nepal_") ? `Nepal ${label}` : s.dataset.endsWith("_spot") ? `World ${label}` : s.dataset]));
   const sources = d.sources.filter(s => s.dataset === "usd_npr" || s.dataset.startsWith("nepal_") || s.dataset.endsWith("_spot"));
   const problems = sources.filter((s) => s.status === "stale" || s.status === "unavailable");
 
   return (
     <AppShell asset={asset}>
-      <section aria-labelledby="advice" className={`rounded-2xl border ${tone.ring} ${tone.soft} p-5 sm:p-6`}>
-        <DecisionLabel decision={d.decision} className="rounded-full bg-panel/70 px-3 py-1 text-sm uppercase tracking-wide" />
-        <h1 id="advice" className="mt-3 text-[1.75rem] font-semibold leading-tight tracking-tight text-ink">
+      <AutoRefresh asset={asset} createdAt={d.created_at} ageSeconds={d.age_seconds} marketOpen={d.market_open} />
+      <section aria-labelledby="advice" className="metal-top rounded-2xl border border-line bg-panel p-5 sm:p-6">
+        <DecisionLabel decision={d.decision} className={`rounded-full ${tone.soft} px-3 py-1 text-[13px] uppercase tracking-[0.06em]`} />
+        <h1 id="advice" className="mt-4 text-[2rem] font-semibold leading-[1.15] text-ink">
           {headline}
         </h1>
         <p className="mt-3 max-w-[55ch] text-lg leading-relaxed text-ink">{d.summary}</p>
+        {d.limitations.length > 0 && (
+          <ul className="mt-3 space-y-1 text-[15px] text-ink-2">
+            {d.limitations.map((line) => (
+              <li key={line} className="flex gap-2">
+                <Info aria-hidden className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="mt-4 text-sm text-ink-2">
           {CONFIDENCE_WORDS[d.confidence] ?? d.confidence} · Check again {d.next_review.charAt(0).toLowerCase() + d.next_review.slice(1)}
         </p>
@@ -114,14 +128,20 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
         </p>
       )}
 
-      <CardColumns
-        left={[
-      <Section title={`Nepal ${label}, per tola`}>
+      <StackColumns
+        items={[
+          { side: "left", card: d.position?.plain && (
+            <Section title="Where the price is" updated={d.created_at}>
+              <PositionFacts position={d.position} label={label} />
+            </Section>
+          ) },
+          { side: "right", card: (
+      <Section title={`Nepal ${label}, per tola`} className="metal-top">
         {d.prices.nepal_per_tola == null ? (
           <p className="text-ink-2">Not collected yet.</p>
         ) : (
           <>
-            <p className="num text-4xl font-semibold tracking-tight">{rupees(d.prices.nepal_per_tola)}</p>
+            <p className="num font-display text-[2.9rem] font-bold leading-none text-price">{rupees(d.prices.nepal_per_tola)}</p>
             <p className="mt-1 text-sm text-ink-2">
               {d.asset.local_label} · Updated{" "}
               {d.prices.nepal_time_known && d.prices.nepal_published_at
@@ -136,31 +156,63 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
                 </>
               )}
             </p>
+            {(next || d.prices.world_usd_per_ounce != null) && (
+              <LiveNextPrice
+                asset={asset}
+                label={label}
+                nepalPrice={d.prices.nepal_per_tola}
+                snapshotNext={next}
+                snapshotWorld={d.prices.world_usd_per_ounce}
+                snapshotAt={d.created_at}
+              />
+            )}
             {next && (
-              <div className="mt-4 rounded-xl border border-line bg-ground px-4 py-3">
-                <p className="text-sm text-ink-2">
-                  Expected at Nepal&apos;s next update · <span className="num">{nepalTime(next.publish_at)}</span>
-                </p>
-                <p className="num mt-0.5 text-lg font-semibold">
-                  about {rupees(next.estimate)}
-                  {nextChange !== 0 && (
-                    <span className={`ml-2 whitespace-nowrap text-sm font-medium ${nextChange > 0 ? "text-buy" : "text-wait"}`}>
-                      {nextChange > 0 ? "up" : "down"} {rupees(Math.abs(nextChange))}
-                    </span>
-                  )}
-                </p>
-                <p className="num text-xs leading-relaxed text-ink-2">
-                  Likely between {rupees(next.low)} and {rupees(next.high)} (about 8 in 10 times). Based on how world {label} and the dollar
-                  have moved since today&apos;s price was set.
-                </p>
-              </div>
+              <Link href={withAsset("/track-record", asset)} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-accent-hover underline">
+                How accurate has this been?
+              </Link>
             )}
             <div className="mt-5">
               <NepalPriceChart points={history} />
             </div>
           </>
         )}
-      </Section>,
+      </Section>
+          ) },
+          { side: "left", card: (d.split || d.second_half) && (
+            <Section title={d.second_half ? "Second half of your purchase" : "Buying in two parts"} updated={d.created_at}>
+              <TwoPartPlan split={d.split} secondHalf={d.second_half} />
+            </Section>
+          ) },
+          { side: "left", card: d.key_levels.some((k) => k.rupees != null) && (
+            <Section title="Floors and ceilings" updated={d.created_at}>
+              <KeyLevels levels={d.key_levels} />
+            </Section>
+          ) },
+          { side: "right", card: d.announcements && (
+            <Section title="Coming up: US announcements" updated={d.created_at}>
+              <UpcomingAnnouncements announcements={d.announcements} />
+            </Section>
+          ) },
+          { side: "left", card: (
+      <Section title="Why" updated={d.created_at}>
+        <ul className="space-y-3 text-[17px] leading-relaxed">
+          {d.reasons.map((reason) => (
+            <li key={reason.plain} className="flex gap-3">
+              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
+              <span>{reason.plain}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
+          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-on-accent transition-colors hover:bg-accent-hover"
+        >
+          View detailed analysis
+          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
+        </Link>
+      </Section>
+          ) },
+          { side: "right", card: (
       <Section title="What would change this" updated={d.created_at}>
         <p className="text-[17px] leading-relaxed">{d.what_would_change}</p>
         {d.next_event && (
@@ -169,8 +221,21 @@ export default async function TodayPage({ searchParams }: { searchParams: Promis
             {d.next_event.forces_wait === false ? " It can move prices sharply either way." : ""}
           </p>
         )}
-      </Section>,
-d.forecasts.length > 0 && (
+      </Section>
+          ) },
+          { side: "left", card: (
+      <Section title="Your purchase">
+        <p className="mb-3 text-[15px] text-ink-2">
+          {plan.completed_at
+            ? `Bought on ${nepalTime(plan.completed_at)}.`
+            : plan.waiting_since
+              ? `Waiting ${Math.floor(d.waiting.days ?? 0)} of 7 days.`
+              : "Not waiting yet."}
+        </p>
+        <PlanActions key={asset} plan={plan} asset={asset} label={label} twoPart={d.second_half ? "second" : d.split ? "first" : null} />
+      </Section>
+          ) },
+          { side: "right", card: d.forecasts.length > 0 && (
         <Section title={`What might happen to world ${label}`} updated={d.created_at}>
           <ul className="space-y-5">
             {d.forecasts.map((f) => (
@@ -201,36 +266,8 @@ d.forecasts.length > 0 && (
             Based on what happened after the {d.forecasts[0]?.sample_size ?? 100} most similar days in the available history. A guide, not a promise.
           </p>
         </Section>
-      ),
-      <Section title="Your purchase">
-        <p className="mb-3 text-[15px] text-ink-2">
-          {plan.completed_at
-            ? `Bought on ${nepalTime(plan.completed_at)}.`
-            : plan.waiting_since
-              ? `Waiting ${Math.floor(d.waiting.days ?? 0)} of 7 days.`
-              : "Not waiting yet."}
-        </p>
-        <PlanActions key={asset} plan={plan} asset={asset} label={label} />
-      </Section>,
-        ]}
-        right={[
-      <Section title="Why" updated={d.created_at}>
-        <ul className="space-y-3 text-[17px] leading-relaxed">
-          {d.reasons.map((reason) => (
-            <li key={reason.plain} className="flex gap-3">
-              <span aria-hidden className="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent" />
-              <span>{reason.plain}</span>
-            </li>
-          ))}
-        </ul>
-        <Link
-          href={withAsset(`/details?id=${d.snapshot_id}`, asset)}
-          className="mt-5 inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-[15px] font-semibold text-white transition-colors hover:bg-accent-hover"
-        >
-          View detailed analysis
-          <ArrowRight aria-hidden className="size-4" strokeWidth={1.75} />
-        </Link>
-      </Section>,
+      ) },
+          { side: "left", card: (
       <Section title="AI's take" updated={ai?.result?.finished_at}>
         {ai?.result ? (
           <>
@@ -252,12 +289,13 @@ d.forecasts.length > 0 && (
         <div className="mt-4">
           <AskAiButton key={asset} asset={asset} busy={!!ai?.latest_run && ["queued", "running"].includes(ai.latest_run.status)} />
         </div>
-      </Section>,
-news && (
+      </Section>
+          ) },
+          { side: "right", card: news && (
         <Section title={`${d.asset.label} in the news`}>
           <NewsSection key={asset} news={news} asset={asset} label={label} />
         </Section>
-      ),
+      ) },
         ]}
       />
 

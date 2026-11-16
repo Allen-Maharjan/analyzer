@@ -1,0 +1,123 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Today · sample D · Onyx and gold</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+<style>:root{--display:'Cormorant Garamond', Georgia, serif;--body:'DM Sans', system-ui, sans-serif;--radius:18px;--ground:#0b0a08;--bar:#0b0a08f2;--panel:#15130f;--inset:#1c1914;--line:#2e2920;--ink:#f3ece0;--ink-2:#b9ad98;--accent:#d6b25e;--accent-ink:#e3c57d;--accent-soft:#2e2615;--on-accent:#15110a;--wait-text:#f2a49c;--buy-soft:#10261b;--buy-text:#86d9aa;--price:#e8cd8a;--metal:linear-gradient(90deg,#6f5420,#f3d98b 45%,#a9812f);color-scheme:dark}:root[data-theme=light]{--ground:#f7f3ea;--bar:#f7f3eaf2;--panel:#fffdf8;--inset:#f3ede0;--line:#e3d9c4;--ink:#1a1610;--ink-2:#5e5444;--accent:#7a5a12;--accent-ink:#6b4e0e;--accent-soft:#f1e6c8;--on-accent:#ffffff;--wait-text:#a8261c;--buy-soft:#e3f1e7;--buy-text:#146c3a;--price:#6b4e0e;--metal:linear-gradient(90deg,#b08a3e,#ecd396 45%,#9c7428);color-scheme:light}
+*{box-sizing:border-box} html{-webkit-text-size-adjust:100%} body{margin:0;background:var(--ground);color:var(--ink);font:400 16px/1.5 var(--body);}
+svg{width:1.1em;height:1.1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+::selection{background:var(--accent-soft);color:var(--ink)} :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums} b{font-weight:650}
+.bar{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 12px;background:var(--bar);border-bottom:1px solid var(--line);backdrop-filter:saturate(1.2)}
+.bar nav{display:flex} .bar a{display:inline-flex;align-items:center;min-height:44px;padding:0 10px;color:var(--ink-2);text-decoration:none;font-size:15px;border-radius:10px}
+.bar a[aria-current]{color:var(--accent-ink);background:var(--accent-soft);font-weight:650}
+.icon-btn{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:12px;background:transparent;color:var(--ink-2);cursor:pointer}
+main{max-width:640px;margin:0 auto;padding:16px 16px 64px}
+.seg{display:inline-flex;padding:4px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:16px}
+.seg button{min-height:40px;min-width:84px;border:0;border-radius:10px;background:transparent;color:var(--ink-2);font:inherit;font-size:15px}
+.seg button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent-ink);font-weight:650}
+h1,h2{text-wrap:balance;margin:0} h2{font:650 1rem/1.4 var(--display);margin-bottom:10px}
+.card{margin-top:14px;padding:18px 18px 20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
+.lead{font-size:1.125rem;line-height:1.6;margin:12px 0 0;max-width:55ch} .body-lg{font-size:17px;line-height:1.6;margin:0}
+.meta{font-size:14px;color:var(--ink-2);margin:6px 0 0} .small{font-size:12.5px;color:var(--ink-2);margin:2px 0 0} .sub{font-size:14px;color:var(--ink-2)}
+.price{font:650 2.5rem/1.1 var(--display);letter-spacing:-0.02em;margin:0} .next{font-weight:650;font-size:1.125rem;margin:2px 0 0}
+.down{color:var(--wait-text);font-weight:600;white-space:nowrap} .wait-text{color:var(--wait-text)!important;font-weight:600}
+.inset{margin-top:14px;padding:12px 14px;border-radius:calc(var(--radius) - 6px);background:var(--inset);border:1px solid var(--line)}
+.tag{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:650}
+.link{display:inline-flex;align-items:center;min-height:44px;color:var(--accent-ink);font-size:14px;font-weight:600;text-underline-offset:4px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 0} .pair div{padding:10px 12px;border-radius:calc(var(--radius) - 6px);background:var(--inset);border:1px solid var(--line)}
+.pair dt{font-size:13px;color:var(--ink-2)} .pair dd{margin:2px 0 0;font-weight:650} .pair dd.sub{font-weight:400;font-size:12.5px}
+.rows{list-style:none;margin:0;padding:0} .rows li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;padding:10px 0;border-top:1px solid var(--line)} .rows li:first-child{border-top:0;padding-top:0}
+.rows i{font-style:normal;color:var(--ink-2)}
+.events li{display:block} .row-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px} .when{display:inline-flex;gap:6px;align-items:center;font-size:14px;color:var(--ink-2)}
+.events p{margin:4px 0 0} .risk{font-size:12.5px;color:var(--ink-2);font-weight:500}
+.dots{margin:0;padding-left:1.1em} .dots li{margin:6px 0} .dots li::marker{color:var(--accent)}
+.btn{display:inline-flex;gap:8px;align-items:center;min-height:44px;margin-top:16px;padding:0 16px;border-radius:12px;background:var(--accent);color:var(--on-accent);font-weight:650;font-size:15px;text-decoration:none}
+.foot{margin:20px 4px 0;font-size:12.5px;color:var(--ink-2)}
+.verdict{display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:750;letter-spacing:.02em;text-transform:uppercase;font-size:14px}
+
+.bar{border-bottom:0} .bar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--metal);opacity:.7}
+.advice{position:relative;margin-top:0;padding:22px 20px 20px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.advice::before,.price-card::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;background:var(--metal)}
+.advice .verdict{padding:4px 12px 4px 10px;border-radius:99px;background:var(--buy-soft);color:var(--buy-text);font-size:13px;letter-spacing:.06em}
+.advice h1{margin-top:14px;font:600 2rem/1.15 var(--display);letter-spacing:-0.01em}
+.price-card{position:relative;overflow:hidden}
+.price{font-family:var(--display);color:var(--price)}
+.card{box-shadow:0 1px 0 #00000008}
+.price{font-size:2.9rem;font-weight:700} .card h2{font:700 1.2rem/1.3 var(--display);letter-spacing:.005em}</style></head><body>
+<header class="bar">
+  <nav aria-label="Main"><a aria-current="page" href="#">Today</a><a href="#">Details</a><a href="#">Record</a><a href="#">Settings</a></nav>
+  <button class="icon-btn theme" type="button" aria-label="Switch light or dark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
+</header>
+<main>
+  <div class="seg" role="group" aria-label="Metal"><button aria-pressed="true">Gold</button><button aria-pressed="false">Silver</button></div>
+
+  <section class="advice buy" aria-labelledby="h">
+    <p class="verdict"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span>Buy</span></p>
+    <h1 id="h">Good time to buy</h1>
+    <p class="lead">Nepal's price has caught up with world prices, world prices aren't falling, and no big announcement is close. There's no clear reason to wait.</p>
+    <p class="meta">Fairly sure · Check that today's price is still the one shown before buying</p>
+    <p class="meta num">Advice updated 16 Nov, 9:42 am · 5 min ago</p>
+  </section>
+
+  <section class="card">
+    <h2>Where the price is</h2>
+    <p class="body-lg">Gold in Nepal is at its lowest price since 4 Oct. World gold made its lowest price of the past year 2 days ago.</p>
+    <dl class="pair num">
+      <div><dt>Lowest of the last 30 updates</dt><dd>Rs 2,70,200</dd><dd class="sub">Sun 15 Nov</dd></div>
+      <div><dt>Highest of the last 30 updates</dt><dd>Rs 2,96,500</dd><dd class="sub">Sun 11 Oct</dd></div>
+    </dl>
+  </section>
+
+  <section class="card price-card">
+    <h2>Nepal gold, per tola</h2>
+    <p class="price num">Rs 2,70,200</p>
+    <p class="meta num">Hallmark gold · Updated 15 Nov, 10:29 am · <span class="down">down Rs 1,500 since Fri 13 Nov</span></p>
+    <p class="meta num">World gold now: <b>$3,875.35</b> per ounce · 45 seconds ago</p>
+    <div class="inset">
+      <p class="meta">Expected at Nepal's next update · 16 Nov, 10:45 am <span class="tag">live</span></p>
+      <p class="next num">about Rs 2,69,700 <span class="down">down Rs 500</span></p>
+      <p class="small num">Likely between Rs 2,68,000 and Rs 2,71,300 (about 8 in 10 times).</p>
+    </div>
+    <a class="link" href="#">How accurate has this been? Off by Rs 757 on average over 7 updates</a>
+  </section>
+
+  <section class="card">
+    <h2>Floors and ceilings</h2>
+    <ul class="rows num">
+      <li><span>Ceiling about <b>Rs 2,74,500</b> <i>(held 4 times)</i></span><span class="sub">broken, then recovered</span></li>
+      <li><span>Ceiling about <b>Rs 2,70,000</b> <i>(your watch level)</i></span><span class="sub">price is past it now</span></li>
+      <li><span>Floor about <b>Rs 2,68,000</b> <i>(held twice)</i></span><span class="sub">being tested now</span></li>
+      <li><span>Floor about <b>Rs 2,40,500</b> <i>(held 3 times)</i></span></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Coming up: US announcements</h2>
+    <ul class="rows events">
+      <li><div class="row-top"><b>US PCE inflation report</b><span class="when num"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>25 Nov, 7:15 pm</span></div>
+        <p class="sub">Higher than expected usually pushes gold down; lower usually lifts it.</p><p class="risk">Shown as a risk; it does not change the advice by itself.</p></li>
+      <li><div class="row-top"><b>US jobs report</b><span class="when num"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>4 Dec, 7:15 pm</span></div>
+        <p class="sub">Strong numbers usually push gold down; weak numbers usually lift it.</p><p class="risk">Shown as a risk; it does not change the advice by itself.</p></li>
+      <li><div class="row-top"><b>US interest-rate decision</b><span class="when num"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>10 Dec, 12:45 am</span></div>
+        <p class="sub">The biggest scheduled mover; prices can jump either way.</p><p class="risk wait-text">Changes the advice: it says Wait in the day before.</p></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Why</h2>
+    <ul class="dots body-lg">
+      <li>World prices have stopped falling for now.</li>
+      <li>Nepal's gold price has dropped Rs 14,100 per tola over the last three price updates.</li>
+      <li>Nepal's price has already caught up with world prices.</li>
+    </ul>
+    <a class="btn" href="#">View detailed analysis <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+  </section>
+  <p class="foot num">Nepal gold up to date · Dollar rate up to date · World gold up to date</p>
+</main>
+<script>
+  const root = document.documentElement;
+  document.querySelector('.theme').addEventListener('click', () => {
+    root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+  });
+</script>
+</body></html>

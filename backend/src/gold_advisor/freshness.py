@@ -11,6 +11,9 @@ from gold_advisor.domain import NEPAL_TZ, NEW_YORK_TZ, FreshnessStatus, Timefram
 from gold_advisor.assets import METALS_CALENDAR, MarketCalendar
 from gold_advisor.market import is_xau_open, last_open_instant
 
+# freshness-2: a quiet Nepal source with a healthy collector is NOT_PUBLISHED, not STALE.
+VERSION = "freshness-2"
+
 # Scheduled cloud runs collect every 30 minutes (GitHub Actions can start a few minutes late).
 LIVE_QUOTE_MAX_AGE = timedelta(minutes=35)
 # Dukascopy history typically lags real time; allow that before calling bars stale.
@@ -24,6 +27,10 @@ CANDLE_MAX_LAG: dict[Timeframe, timedelta] = {
 # FENEGOSIDA usually publishes 10:00–11:00 NPT, Sunday–Friday.
 NEPAL_PUBLICATION_DUE = time(12, 0)
 NEPAL_NO_PUBLICATION_WEEKDAY = 5  # Saturday
+# "Nepal answered, nothing new": the today-collector succeeded this recently...
+NEPAL_COLLECTOR_RECENT = timedelta(hours=2)
+# ...and the last publication is at most this many days old. Longer silences count as broken data.
+NEPAL_QUIET_MAX_DAYS = 7
 # NRB usually publishes just after midnight NPT, occasionally late in the day.
 NRB_LATE_PUBLICATION_CUTOFF = time(18, 0)
 FRED_MAX_BUSINESS_DAYS_BEHIND = 3
@@ -81,13 +88,26 @@ def expected_nepal_publication_date(now: datetime) -> date:
     return _previous_nepal_publication_day(today)
 
 
-def nepal_publication(latest_rate_date: date | None, now: datetime) -> Freshness:
+def nepal_publication(latest_rate_date: date | None, now: datetime, collector_last_success: datetime | None = None) -> Freshness:
+    """A missing publication is NOT_PUBLISHED (not STALE) when the collector reached the source
+    recently and found nothing newer, for up to a week: the source works but Nepal is quiet,
+    usually for a holiday. A failing collector or a longer silence stays STALE."""
     if latest_rate_date is None:
         return _unavailable()
     expected = expected_nepal_publication_date(now)
     days_behind = (expected - latest_rate_date).days
     if latest_rate_date >= expected:
         return Freshness(FreshnessStatus.FRESH, f"publication for {latest_rate_date} is current")
+    quiet_days = (now.astimezone(NEPAL_TZ).date() - latest_rate_date).days
+    if (
+        collector_last_success is not None
+        and now - collector_last_success < NEPAL_COLLECTOR_RECENT
+        and quiet_days <= NEPAL_QUIET_MAX_DAYS
+    ):
+        return Freshness(
+            FreshnessStatus.NOT_PUBLISHED,
+            f"source checked recently; nothing newer than {latest_rate_date} ({days_behind} days behind; may be a public holiday)",
+        )
     return Freshness(
         FreshnessStatus.STALE,
         f"expected publication for {expected}, latest is {latest_rate_date} ({days_behind} days behind;"
@@ -123,3 +143,38 @@ def fred_daily(latest_obs_date: date | None, now: datetime) -> Freshness:
     if behind <= FRED_MAX_BUSINESS_DAYS_BEHIND:
         return Freshness(FreshnessStatus.FRESH, f"{behind} US business days behind")
     return Freshness(FreshnessStatus.STALE, f"{behind} US business days behind (limit {FRED_MAX_BUSINESS_DAYS_BEHIND})")
+
+
+def _parse_instant(value: datetime | date | str | None) -> datetime | date | None:
+    if value is None or isinstance(value, (datetime, date)):
+        return value
+    return datetime.fromisoformat(value) if "T" in value else date.fromisoformat(value)
+
+
+def for_dataset(
+    dataset: str,
+    latest_observation: datetime | date | str | None,
+    now: datetime,
+    calendar: MarketCalendar = METALS_CALENDAR,
+    collector_last_success: datetime | str | None = None,
+) -> Freshness | None:
+    """Re-judge a stored source status at ``now`` (dataset names as in ``health.all_sources``).
+    Returns None for an unknown dataset."""
+    latest = _parse_instant(latest_observation)
+    success = _parse_instant(collector_last_success)
+    if dataset.endswith("_spot") or dataset.endswith("_spot_backup"):
+        return live_quote(latest, now, calendar)
+    if "_candles_" in dataset:
+        try:
+            timeframe = Timeframe(dataset.rsplit("_candles_", 1)[1])
+        except ValueError:
+            return None
+        return candles(timeframe, latest, now, calendar)
+    if dataset.startswith("nepal_"):
+        day = latest.date() if isinstance(latest, datetime) else latest
+        return nepal_publication(day, now, success if isinstance(success, datetime) else None)
+    if dataset == "usd_npr":
+        return nrb_rate(latest.date() if isinstance(latest, datetime) else latest, now)
+    if dataset.startswith("fred_"):
+        return fred_daily(latest.date() if isinstance(latest, datetime) else latest, now)
+    return None

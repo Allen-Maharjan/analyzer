@@ -5,6 +5,8 @@
 #   NEON_DATABASE_URL      Neon connection string (direct, not pooled)
 #   GA_OPENROUTER_API_KEY  OpenRouter key; free models only. Optional: without it the AI step is skipped.
 #   FREENEWSAPI_KEY        FreeNewsAPI key. Optional: without it news refreshes are recorded as unavailable.
+#   GA_VAPID_PRIVATE_KEY   Web Push private key. Optional: without it (and GA_VAPID_SUBJECT) no notifications.
+#   GA_VAPID_SUBJECT       Web Push contact, "mailto:you@example.com".
 name: collect
 
 on:
@@ -41,6 +43,8 @@ jobs:
       GA_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
       GA_OPENROUTER_API_KEY: ${{ secrets.GA_OPENROUTER_API_KEY }}
       FREENEWSAPI_KEY: ${{ secrets.FREENEWSAPI_KEY }}
+      GA_VAPID_PRIVATE_KEY: ${{ secrets.GA_VAPID_PRIVATE_KEY }}
+      GA_VAPID_SUBJECT: ${{ secrets.GA_VAPID_SUBJECT }}
       PYTHONPATH: ${{ github.workspace }}/runner
       PYTHONUNBUFFERED: "1"
       GA_FORCE_DAILY: ${{ inputs.force_daily }}

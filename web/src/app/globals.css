@@ -1,24 +1,60 @@
 @import "tailwindcss";
 
+/* Onyx and gold (owner's choice, 2026-11-16). Dark is the default; [data-theme="light"] is the ivory
+   showroom version. layout.tsx sets data-theme before the first paint from the Settings choice. */
 @theme {
-  --font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  --font-sans: var(--font-body), system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  --font-display: var(--font-heading), Georgia, "Times New Roman", serif;
 
-  --color-ground: #f5f5f4;
-  --color-panel: #ffffff;
-  --color-line: #e7e5e4;
-  --color-ink: #1c1917;
-  --color-ink-2: #57534e;
-  --color-hover: #f5f5f4;
-  --color-accent: #a16207;
-  --color-accent-hover: #854d0e;
-  --color-accent-soft: #fef3c7;
+  --color-ground: #0b0a08;
+  --color-panel: #15130f;
+  --color-inset: #1c1914;
+  --color-line: #2e2920;
+  --color-ink: #f3ece0;
+  --color-ink-2: #b9ad98;
+  --color-hover: #221e17;
+  --color-accent: #d6b25e;
+  --color-accent-hover: #e3c57d;
+  --color-accent-soft: #2e2615;
+  --color-on-accent: #15110a;
+  --color-price: #e8cd8a;
+  --color-draw: #8fb0ff;
 
-  --color-buy: #15803d;
-  --color-buy-soft: #ecfdf3;
-  --color-wait: #b91c1c;
-  --color-wait-soft: #fef2f2;
-  --color-watch: #b45309;
-  --color-watch-soft: #fffbeb;
+  --color-buy: #6fcf97;
+  --color-buy-soft: #10261b;
+  --color-wait: #f08a80;
+  --color-wait-soft: #2c1513;
+  --color-watch: #e8b04b;
+  --color-watch-soft: #2b2010;
+}
+
+:root {
+  color-scheme: dark;
+  --metal: linear-gradient(90deg, #6f5420, #f3d98b 45%, #a9812f);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --metal: linear-gradient(90deg, #b08a3e, #ecd396 45%, #9c7428);
+  --color-ground: #f7f3ea;
+  --color-panel: #fffdf8;
+  --color-inset: #f3ede0;
+  --color-line: #e3d9c4;
+  --color-ink: #1a1610;
+  --color-ink-2: #5e5444;
+  --color-hover: #f1eadb;
+  --color-accent: #7a5a12;
+  --color-accent-hover: #6b4e0e;
+  --color-accent-soft: #f1e6c8;
+  --color-on-accent: #ffffff;
+  --color-price: #6b4e0e;
+  --color-draw: #1d4ed8;
+  --color-buy: #146c3a;
+  --color-buy-soft: #e3f1e7;
+  --color-wait: #a8261c;
+  --color-wait-soft: #fbe9e7;
+  --color-watch: #8a4a00;
+  --color-watch-soft: #fcefd9;
 }
 
 @layer base {
@@ -46,10 +82,40 @@
   }
   h1,
   h2 {
+    font-family: var(--font-display);
     text-wrap: balance;
+  }
+  input,
+  select,
+  textarea {
+    caret-color: var(--color-accent);
   }
 }
 
 .num {
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* A 1px gold hairline along the top edge: the advice panel and the main price only. */
+.metal-top {
+  position: relative;
+  overflow: hidden;
+}
+.metal-top::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--metal);
+}
+.metal-bottom {
+  position: relative;
+}
+.metal-bottom::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: var(--metal);
+  opacity: 0.7;
 }

@@ -31,5 +31,6 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg).*)"],
+  // The service worker, manifest and icons must load without a session (browsers fetch the manifest without cookies).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon\\.png|sw\\.js|manifest\\.webmanifest|icons/).*)"],
 };

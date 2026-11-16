@@ -1,10 +1,10 @@
 """Bounded market reads. The caller owns the session and transaction."""
 from dataclasses import dataclass
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import not_, select
 from sqlalchemy.orm import Session
 from gold_advisor.assets import AssetDefinition
-from gold_advisor.domain import Source, Timeframe
+from gold_advisor.domain import QualityFlag, Source, Timeframe
 from gold_advisor.persistence.models import CandleRow, SpotQuoteRow, AnalysisSnapshotRow
 
 @dataclass(frozen=True)
@@ -32,9 +32,13 @@ def candles(session: Session, query: MarketQuery) -> list[CandleRow]:
         stmt = stmt.where(CandleRow.bucket_start < query.end)
     return list(reversed(session.scalars(stmt.order_by(CandleRow.bucket_start.desc()).limit(query.limit)).all()))
 
-def latest_quote(session: Session, asset: AssetDefinition, sources: tuple[Source, ...]) -> SpotQuoteRow | None:
-    return session.scalars(select(SpotQuoteRow).where(SpotQuoteRow.instrument == asset.instrument,
-        SpotQuoteRow.source.in_([s.value for s in sources])).order_by(SpotQuoteRow.observed_at.desc(), SpotQuoteRow.source).limit(1)).first()
+def latest_quote(session: Session, asset: AssetDefinition, sources: tuple[Source, ...], usable_only: bool = True) -> SpotQuoteRow | None:
+    """Newest quote from ``sources``. Quotes rejected as an unconfirmed jump are skipped unless asked."""
+    stmt = select(SpotQuoteRow).where(SpotQuoteRow.instrument == asset.instrument,
+        SpotQuoteRow.source.in_([s.value for s in sources]))
+    if usable_only:
+        stmt = stmt.where(not_(SpotQuoteRow.quality_flags.contains([QualityFlag.UNCONFIRMED_JUMP.value])))
+    return session.scalars(stmt.order_by(SpotQuoteRow.observed_at.desc(), SpotQuoteRow.source).limit(1)).first()
 
 def latest_snapshot(session: Session, asset: AssetDefinition) -> AnalysisSnapshotRow | None:
     return session.scalars(select(AnalysisSnapshotRow).where(AnalysisSnapshotRow.asset_id == asset.id)

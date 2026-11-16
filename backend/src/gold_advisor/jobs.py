@@ -7,14 +7,16 @@ written in its own transaction so a failed collection is still visible in source
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import func, select
 
+from gold_advisor import quotes
 from gold_advisor.assets import ASSETS, AssetDefinition, GOLD
 from gold_advisor.collectors import dukascopy, fenegosida, fomc, fred, gold_api, nrb, swissquote
 from gold_advisor.collectors.http import make_client
-from gold_advisor.collectors.types import Candle, CollectionResult
+from gold_advisor.collectors.types import Candle, CollectionResult, SpotQuote
 from gold_advisor.config import get_settings
 from gold_advisor.domain import (
     DERIVED_TIMEFRAMES,
@@ -30,7 +32,7 @@ from gold_advisor.domain import (
     Timeframe,
 )
 from gold_advisor.market import is_xau_open, last_open_instant
-from gold_advisor.persistence import repository
+from gold_advisor.persistence import market_data, repository
 from gold_advisor.persistence.db import session_scope
 from gold_advisor.persistence.models import (
     CandleRow,
@@ -77,23 +79,55 @@ def run_job(job: str, source: Source, work: Callable[[], CollectionResult]) -> C
 
 # --- Live spot ---------------------------------------------------------------------------
 
+SPOT_SOURCES = ((Source.GOLD_API, gold_api.fetch), (Source.SWISSQUOTE, swissquote.fetch))
 
-def _spot_job(source: Source, fetch, asset: AssetDefinition = GOLD) -> CollectionResult:
-    def work() -> CollectionResult:
-        with make_client() as client:
-            quote = fetch(client, now=_now(), asset=asset)
-        with session_scope() as session:
-            return repository.save_spot_quote(session, quote)
 
-    return run_job(asset.job(f"{source.value}.spot"), source, work)
+def _fetch_spot(fetch, asset: AssetDefinition, **kwargs):
+    with make_client() as client:
+        return fetch(client, now=_now(), asset=asset, **kwargs)
+
+
+def save_checked_quote(quote: SpotQuote, other: SpotQuote | None, asset: AssetDefinition) -> CollectionResult:
+    """Store a quote with the cross-check flags from ``quotes.flags``: against the previous usable
+    stored quote and against the other source's quote from the same run."""
+    with session_scope() as session:
+        prev = market_data.latest_quote(session, asset, tuple(s for s, _ in SPOT_SOURCES))
+        extra = quotes.flags(
+            float(quote.price),
+            quote.observed_at,
+            (float(prev.price), prev.observed_at) if prev else None,
+            (float(other.price), other.observed_at) if other else None,
+        )
+        flagged = replace(quote, quality_flags=tuple(dict.fromkeys((*quote.quality_flags, *extra))))
+        return repository.save_spot_quote(session, flagged)
 
 
 def collect_gold_spot(asset: AssetDefinition = GOLD) -> CollectionResult:
-    """Gold API first; Swissquote only when Gold API fails. Each price keeps its source."""
-    try:
-        return _spot_job(Source.GOLD_API, gold_api.fetch, asset)
-    except Exception:  # noqa: BLE001 - failure already recorded in collection_runs
-        return _spot_job(Source.SWISSQUOTE, swissquote.fetch, asset)
+    """Both sources every run, so they can be cross-checked. Each source's failure is recorded on
+    its own run row; this fails only when neither source gave a price. Each price keeps its source."""
+    fetched: dict[Source, SpotQuote | Exception] = {}
+    for source, fetch in SPOT_SOURCES:
+        try:
+            fetched[source] = _fetch_spot(fetch, asset)
+        except Exception as exc:  # noqa: BLE001 - recorded below in collection_runs
+            fetched[source] = exc
+    total, saved = CollectionResult(), 0
+    for source, item in fetched.items():
+        other = next((q for s, q in fetched.items() if s is not source and isinstance(q, SpotQuote)), None)
+
+        def work(item=item, other=other) -> CollectionResult:
+            if isinstance(item, Exception):
+                raise item
+            return save_checked_quote(item, other, asset)
+
+        try:
+            total.add(run_job(asset.job(f"{source.value}.spot"), source, work))
+            saved += 1
+        except Exception:  # noqa: BLE001 - failure already recorded in collection_runs
+            continue
+    if not saved:
+        raise RuntimeError(f"no world {asset.label.lower()} price from either source")
+    return total
 
 
 # --- Nepal published rates ---------------------------------------------------------------

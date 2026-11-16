@@ -41,6 +41,10 @@ class AssetDefinition:
     # FENEGOSIDA publishes gold in whole hundreds and silver in fives; forecasts are rounded the same way.
     nepal_price_step: float = 5.0
     wait_decline_pct: float = -0.02
+    # Rupee levels on the Today page are rounded to this ("Floor about Rs 2,67,500").
+    level_rupee_step: float = 5.0
+    # Has a Trade screen (buy and sell plan). Gold is bought for festivities and never gets sell advice.
+    tradable: bool = False
     # News search (FreeNewsAPI in_title phrases) and the words a headline must contain.
     news_terms: tuple[str, ...] = ()
     news_keywords: tuple[str, ...] = ()
@@ -64,17 +68,18 @@ class AssetDefinition:
     def public(self) -> dict:
         return {"id": self.id, "label": self.label, "instrument": self.instrument,
                 "quote_currency": self.quote_currency, "price_unit": self.price_unit,
-                "local_label": self.local_label, "timeframes": list(self.timeframes)}
+                "local_label": self.local_label, "timeframes": list(self.timeframes), "tradable": self.tradable}
 
 ASSETS = {
     a.id: a for a in (
         AssetDefinition('gold', 'Gold', 'XAU/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAU', candle_symbol='xauusd',
                         metal=Metal.GOLD, purity=Purity.HALLMARK, local_label='Hallmark gold', watch_levels=(4000.0,), nepal_price_step=100.0,
+                        level_rupee_step=500.0,
                         news_terms=('gold price', 'gold bullion', 'XAU USD'), news_keywords=('gold', 'xau', 'bullion', 'precious metal')),
         AssetDefinition('silver', 'Silver', 'XAG/USD', 'USD', 'ounce', Source.DUKASCOPY,
                         METALS_CALENDAR, tuple(Timeframe), 'nepal_metal', spot_symbol='XAG', candle_symbol='xagusd',
-                        metal=Metal.SILVER, purity=Purity.PURE_SILVER, local_label='Pure silver',
+                        metal=Metal.SILVER, purity=Purity.PURE_SILVER, local_label='Pure silver', tradable=True,
                         news_terms=('silver price', 'silver bullion', 'XAG USD'), news_keywords=('silver', 'xag', 'bullion', 'precious metal')),
     )
 }

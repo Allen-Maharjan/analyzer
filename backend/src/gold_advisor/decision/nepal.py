@@ -183,6 +183,11 @@ def next_publication_at(now: datetime, latest_rate_date: date | None) -> datetim
     return max(due, now.astimezone(UTC))
 
 
+def hourly_volatility(h1_close: pd.Series) -> float | None:
+    """Standard deviation of hourly log returns over the last ~5 trading days of completed 1h bars."""
+    return float(np.log(h1_close).diff().tail(120).std()) if len(h1_close) > 30 else None
+
+
 def forecast_next(
     lag: NepalLag,
     now: datetime,

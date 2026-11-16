@@ -82,12 +82,15 @@ def test_ai_validates_small_currency_amounts():
 
 def test_spot_failure_uses_same_asset_backup(monkeypatch):
     from gold_advisor import jobs
-    calls = []
-    def attempt(source, fetch, asset):
-        calls.append((source, asset))
+    calls, saved = [], []
+    def fetch(fetch_fn, asset, **kwargs):
+        calls.append((fetch_fn, asset))
         if len(calls) == 1:
             raise httpx.ConnectError('offline')
-        return 'backup'
-    monkeypatch.setattr(jobs, '_spot_job', attempt)
-    assert jobs.collect_gold_spot(SILVER) == 'backup'
-    assert all(asset is SILVER for _, asset in calls)
+        return 'backup quote'
+    monkeypatch.setattr(jobs, '_fetch_spot', fetch)
+    monkeypatch.setattr(jobs, 'run_job', lambda job, source, work: work())
+    monkeypatch.setattr(jobs, 'save_checked_quote', lambda quote, other, asset: saved.append((quote, other, asset)) or jobs.CollectionResult(inserted=1))
+    assert jobs.collect_gold_spot(SILVER).inserted == 1
+    assert len(calls) == 2 and all(asset is SILVER for _, asset in calls)
+    assert saved == [('backup quote', None, SILVER)]

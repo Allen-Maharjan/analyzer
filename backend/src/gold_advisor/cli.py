@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument("--end", type=date.fromisoformat, default=None, help="YYYY-MM-DD")
     replay.add_argument("--lookahead-sample", type=int, default=30, help="days rerun on cut-off history (0 to skip)")
     replay.add_argument("--csv", default=None, help="write one row per day to this file")
+    replay.add_argument("--compare-split", action="store_true", help="compare one purchase with buying in two parts")
+    replay.add_argument("--trade", action="store_true", help="replay the silver trade rule at 0%%, 2%% and 4%% buy-back gaps")
+    replay.add_argument("--store-trade", action="store_true", help="with --trade: save the result for the Trade screen (writes app_settings)")
     args = parser.parse_args(argv)
 
     if args.command == "backtest":
@@ -58,15 +61,23 @@ def main(argv: list[str] | None = None) -> int:
             history = backtest.load(session, asset)
         days = backtest.run(history, asset, args.start or date.min, args.end or date.max)
         report = backtest.summarise(days)
+        if args.compare_split:
+            report["split_comparison"] = backtest.compare_split(days)
+        if args.trade:
+            report["trade_replay"] = backtest.trade_replay(days)
+            if args.store_trade:
+                from gold_advisor import cycle
+
+                cycle.store_trade_replay(asset, report["trade_replay"])
         if args.lookahead_sample > 0:
             mismatches = backtest.lookahead_check(history, asset, days, args.lookahead_sample)
             report["lookahead_check"] = {"sampled": min(args.lookahead_sample, len(days)), "mismatches": mismatches}
         if args.csv:
             with open(args.csv, "w", newline="", encoding="utf-8") as fh:
                 writer = csv.writer(fh)
-                writer.writerow(["day", "nepal_price", "decision", "rule", "next_price_change_pct"])
+                writer.writerow(["day", "nepal_price", "decision", "rule", "next_price_change_pct", "outlook", "split_dip", "split_recovery", "split_deadline"])
                 for d in days:
-                    writer.writerow([d.day, d.nepal_price, d.decision.value, d.rule, d.next_price_change_pct])
+                    writer.writerow([d.day, d.nepal_price, d.decision.value, d.rule, d.next_price_change_pct, d.outlook, d.split_dip, d.split_recovery, d.split_deadline])
         print(json.dumps({"asset": asset.id, **report}, default=str, indent=2))
         return 1 if report.get("lookahead_check", {}).get("mismatches") else 0
 

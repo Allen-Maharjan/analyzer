@@ -66,6 +66,14 @@ def world_market_active(asset: AssetDefinition, now: datetime) -> bool:
     return asset.calendar.is_open(now) or now - asset.calendar.last_open(now) < MARKET_CLOSE_GRACE
 
 
+def nepal_saturday(now: datetime) -> bool:
+    """Saturday in Nepal: no Nepal publication and world markets closed, so a cycle finds nothing new.
+    The workflow skips its own scheduled runs then; the outside timer and self-refresh check this."""
+    from gold_advisor.domain import NEPAL_TZ
+
+    return now.astimezone(NEPAL_TZ).weekday() == 5
+
+
 def collect(now: datetime) -> None:
     for asset in ASSETS.values():
         if not world_market_active(asset, now):
@@ -184,6 +192,56 @@ def news() -> None:
         log.error("news failed: %s", exc)
 
 
+TRADE_REPLAY_EVERY = timedelta(hours=24)
+
+
+def trade_replay_key(asset: AssetDefinition) -> str:
+    return f"trade_replay:{asset.id}"
+
+
+def store_trade_replay(asset: AssetDefinition, result: dict) -> None:
+    from gold_advisor.persistence.models import AppSettingRow
+
+    with session_scope() as session:
+        key = trade_replay_key(asset)
+        row = session.get(AppSettingRow, key) or AppSettingRow(key=key, value={})
+        row.value, row.updated_at = {"value": {**result, "computed_at": datetime.now(UTC).isoformat()}}, datetime.now(UTC)
+        session.add(row)
+
+
+def trade_replays(now: datetime) -> None:
+    """Once a day, replay the silver trade rule over two years for the Trade screen (too slow for a
+    request). Failure never stops the cycle."""
+    from gold_advisor import backtest
+    from gold_advisor.persistence.models import AppSettingRow
+
+    for asset in (a for a in ASSETS.values() if a.tradable):
+        with session_scope() as session:
+            row = session.get(AppSettingRow, trade_replay_key(asset))
+            if row is not None and now - row.updated_at < TRADE_REPLAY_EVERY:
+                continue
+
+        def work(asset=asset) -> str:
+            with session_scope() as session:
+                history = backtest.load(session, asset)
+            days = backtest.run(history, asset, now.date() - timedelta(days=730), now.date())
+            result = backtest.trade_replay(days)
+            store_trade_replay(asset, result)
+            return ", ".join(f"gap {r['gap_pct']:.0f}%: {r['trades']} trades, Rs {r['total_npr']:,.0f}" for r in result["results"])
+
+        _step(f"trade replay {asset.id}", work)
+
+
+def alerts() -> None:
+    from gold_advisor import alerts as push
+
+    try:
+        for line in push.run(session_scope, list(ASSETS.values())):
+            log.info(line)
+    except Exception as exc:  # noqa: BLE001 - notifications are optional; never fail the cycle for them
+        log.error("alerts failed: %s", exc)
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     now = datetime.now(UTC)
@@ -199,6 +257,8 @@ def main() -> int:
             ai_if_significant(asset, datetime.now(UTC))
         except Exception as exc:  # noqa: BLE001 - AI is optional; never fail the cycle for it
             log.error("AI %s failed: %s", asset.id, exc)
+    alerts()
+    trade_replays(datetime.now(UTC))
     # Fail the workflow (so GitHub emails you) only when no analysis could be produced.
     return 0 if any(analysed) else 1
 

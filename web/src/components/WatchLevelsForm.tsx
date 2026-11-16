@@ -71,7 +71,7 @@ export function WatchLevelsForm({ initial, asset }: { initial: number[]; asset: 
         <button
           type="submit"
           disabled={busy || !draft}
-          className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+          className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover disabled:opacity-50"
         >
           Add
         </button>
